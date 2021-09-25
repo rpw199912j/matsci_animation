@@ -298,7 +298,7 @@ class TimeConeIntuition(Scene):
         slide_title = Tex(
             "How do we use the time cone?", font_size=40
         )
-        slide_title.to_corner(UL).shift(UP*0.3)
+        slide_title.to_corner(UL).shift(UP * 0.3)
 
         page_4 = Tex("$4$", font_size=40)
         page_4.to_edge(DR)
@@ -1072,33 +1072,69 @@ class SinglePhaseFraction(Scene):
         self.wait()
 
 
-class PhraseFractionToTTT(Scene):
+class PhaseFractionToTTT(Scene):
     def construct(self):
+        animation_duration = 5
+
         phase_fraction_axes = Axes(
-            x_range=[0, 100, 10],
+            x_range=[0, 1000, 100],
             y_range=[0, 1.2, 0.2],
             x_length=8,
-            y_length=4,
-            x_axis_config={
-                "numbers_to_include": np.arange(0, 100+10, 10)
-            },
+            y_length=2,
             y_axis_config={
                 "numbers_to_include": np.arange(0, 1 + 0.2, 0.2)
             }
         )
-        x_label = phase_fraction_axes.get_x_axis_label(Tex("$t$"))
-        y_label = phase_fraction_axes.get_y_axis_label(Tex("$f_{\\text{transformed}}$"))
 
-        nucleation_rate = ValueTracker(2)
-        growth_rate = ValueTracker(0.01)
-        t_valuetracker = ValueTracker(0)
+        phase_fraction_axes.to_edge(UP, buff=0.5)
+
+        phase_fraction_x_label = phase_fraction_axes.get_x_axis_label(Tex("$t$"))
+        phase_fraction_y_label = phase_fraction_axes.get_y_axis_label(
+            Tex("$f_{\\text{transformed}}$").scale(0.7).rotate(PI/2),
+            edge=LEFT, direction=LEFT, buff=0.4
+        )
+
+        ttt_axes = Axes(
+            x_range=[0, 1000, 100],
+            y_range=[0, animation_duration + 2, 1],
+            x_length=8,
+            y_length=4,
+            x_axis_config={
+                "numbers_to_include": np.arange(0, 1000 + 100, 100)
+            }
+        )
+
+        ttt_axes.to_edge(DOWN, buff=0.1)
+
+        ttt_x_label = ttt_axes.get_x_axis_label(Tex("$t$"))
+        ttt_y_label = ttt_axes.get_y_axis_label(
+            Tex("$T$"),
+            edge=LEFT, direction=LEFT, buff=0.4
+        )
+
+        nucleation_start_value, nucleation_end_value = 0.01, 0.00001
+        growth_rate_start_value, growth_rate_end_value = 0.0008, 0.01
+
+        # a proxy for temperature
+        temp_proxy_tracker = ValueTracker(0)
+        nucleation_rate = ValueTracker(nucleation_start_value).add_updater(
+            lambda num: num.set_value(
+                nucleation_start_value + (
+                        nucleation_end_value - nucleation_start_value) / animation_duration * temp_proxy_tracker.get_value()
+            ))
+        growth_rate = ValueTracker(growth_rate_start_value).add_updater(
+            lambda num: num.set_value(
+                growth_rate_start_value + (
+                        growth_rate_end_value - growth_rate_start_value) / animation_duration * temp_proxy_tracker.get_value()
+            ))
+
+        self.add(nucleation_rate, growth_rate)
+
         fraction_curve = always_redraw(
             lambda:
             phase_fraction_axes.get_graph(
                 lambda t: 1 - np.exp(
-                    -np.pi / 3 * nucleation_rate.get_value() * (growth_rate.get_value() ** 3) * (t ** 4)),
-                x_range=[0, t_valuetracker.get_value()],
-                color=YELLOW
+                    -np.pi / 3 * nucleation_rate.get_value() * (growth_rate.get_value() ** 3) * (t ** 4))
             )
         )
 
@@ -1107,8 +1143,8 @@ class PhraseFractionToTTT(Scene):
         ).next_to(phase_fraction_axes, RIGHT, buff=0.5).shift(UP)
 
         nucleation_rate_value = always_redraw(
-            lambda: DecimalNumber(num_decimal_places=2).set_value(
-                nucleation_rate.get_value()).next_to(nucleation_rate_text)
+            lambda: DecimalNumber(num_decimal_places=1).set_value(
+                nucleation_rate.get_value() * 1e4).next_to(nucleation_rate_text)
         )
 
         growth_rate_text = Tex(
@@ -1116,25 +1152,169 @@ class PhraseFractionToTTT(Scene):
         ).next_to(nucleation_rate_text, DOWN, buff=0.3)
 
         growth_rate_value = always_redraw(
-            lambda: DecimalNumber(num_decimal_places=2).set_value(
-                growth_rate.get_value()).next_to(growth_rate_text).align_to(
+            lambda: DecimalNumber(num_decimal_places=1).set_value(
+                growth_rate.get_value() * 1e4).next_to(growth_rate_text).align_to(
                 growth_rate_text.get_bottom(), DOWN).align_to(nucleation_rate_value, LEFT)
         )
 
         self.play(Create(phase_fraction_axes))
-        self.play(Write(x_label), Write(y_label))
+        self.play(Write(phase_fraction_x_label), Write(phase_fraction_y_label))
         self.wait()
 
-        self.add(fraction_curve)
+        self.play(Create(ttt_axes))
+        self.play(Write(ttt_x_label), Write(ttt_y_label))
+        self.wait()
+
         self.play(Write(VGroup(nucleation_rate_text, nucleation_rate_value,
                                growth_rate_text, growth_rate_value)))
-        self.play(t_valuetracker.animate.set_value(100), run_time=5)
+        self.play(Create(fraction_curve), run_time=3)
         self.wait()
 
-        self.play(nucleation_rate.animate(run_time=5).set_value(0.01),
-                  growth_rate.animate(run_time=5).set_value(2))
+        # figure out the time it takes to reach 1%, 50%, 99% transformed
+        # AHA: need to be more careful about object reference
+        # fraction_transformed_lst = [0.01, 0.5, 0.99]
+        # time_it_takes_lst = []
+        # fraction_dot_lst = []
+        # for fraction_transformed, dot_color in zip(fraction_transformed_lst, [BLUE, YELLOW, PURPLE]):
+        #     time_it_takes = ValueTracker(np.power(
+        #         - 3 * np.log(1 - fraction_transformed) / (
+        #                     np.pi * nucleation_rate.get_value() * (growth_rate.get_value() ** 3)),
+        #         0.25
+        #     )).add_updater(lambda num: num.set_value(np.power(
+        #         - 3 * np.log(1 - fraction_transformed) / (
+        #                     np.pi * nucleation_rate.get_value() * (growth_rate.get_value() ** 3)),
+        #         0.25
+        #     )))
+        #     time_it_takes_lst.append(time_it_takes)
+        #     # fraction_dot_x = time_it_takes.get_value()
+        #     # fraction_dot_y = fraction_transformed
+        #     fraction_dot = always_redraw(
+        #         lambda: Dot(point=phase_fraction_axes.c2p(time_it_takes.get_value(), fraction_transformed),
+        #                     color=dot_color)
+        #     )
+        #     fraction_dot_lst.append(fraction_dot)
+        #
+        # self.add(*time_it_takes_lst)
+        # self.play(Create(fraction_dot_lst[0]), Create(fraction_dot_lst[1]), Create(fraction_dot_lst[2]))
+        # self.wait()
+
+        time_it_takes_10_perc = ValueTracker(np.power(
+            - 3 * np.log(1 - 0.1) / (np.pi * nucleation_rate.get_value() * (growth_rate.get_value() ** 3)), 0.25
+        )).add_updater(lambda num: num.set_value(np.power(
+            - 3 * np.log(1 - 0.1) / (np.pi * nucleation_rate.get_value() * (growth_rate.get_value() ** 3)), 0.25)))
+        fraction_line_horizontal_10_perc = always_redraw(
+            lambda: DashedLine(
+                start=phase_fraction_axes.c2p(0, 0.1),
+                end=phase_fraction_axes.c2p(time_it_takes_10_perc.get_value(), 0.1),
+                color=BLUE
+            )
+        )
+        fraction_line_vertical_10_perc = always_redraw(
+            lambda: DashedLine(
+                start=phase_fraction_axes.c2p(time_it_takes_10_perc.get_value(), 0.1),
+                end=ttt_axes.c2p(time_it_takes_10_perc.get_value(), temp_proxy_tracker.get_value() + 1),
+                color=BLUE
+            )
+        )
+        fraction_dot_10_perc = always_redraw(
+            lambda: Dot(point=phase_fraction_axes.c2p(time_it_takes_10_perc.get_value(), 0.1),
+                        color=BLUE)
+        )
+        ttt_dot_10_perc = always_redraw(
+            lambda: Dot(point=ttt_axes.c2p(time_it_takes_10_perc.get_value(), temp_proxy_tracker.get_value() + 1),
+                        color=BLUE)
+        )
+        ttt_dot_10_perc_path = TracedPath(ttt_dot_10_perc.get_center, stroke_color=BLUE, stroke_width=4)
+
+        self.add(time_it_takes_10_perc)
+        self.play(Create(fraction_line_horizontal_10_perc))
+        self.play(Create(fraction_dot_10_perc))
+        self.play(Create(fraction_line_vertical_10_perc))
+        self.play(Create(ttt_dot_10_perc))
+        self.add(ttt_dot_10_perc_path)
+
+        time_it_takes_50_perc = ValueTracker(np.power(
+            - 3 * np.log(1 - 0.5) / (np.pi * nucleation_rate.get_value() * (growth_rate.get_value() ** 3)), 0.25
+        )).add_updater(lambda num: num.set_value(np.power(
+            - 3 * np.log(1 - 0.5) / (np.pi * nucleation_rate.get_value() * (growth_rate.get_value() ** 3)), 0.25)))
+        fraction_line_horizontal_50_perc = always_redraw(
+            lambda: DashedLine(
+                start=phase_fraction_axes.c2p(0, 0.5),
+                end=phase_fraction_axes.c2p(time_it_takes_50_perc.get_value(), 0.5),
+                color=YELLOW
+            )
+        )
+        fraction_line_vertical_50_perc = always_redraw(
+            lambda: DashedLine(
+                start=phase_fraction_axes.c2p(time_it_takes_50_perc.get_value(), 0.5),
+                end=ttt_axes.c2p(time_it_takes_50_perc.get_value(), temp_proxy_tracker.get_value() + 1),
+                color=YELLOW
+            )
+        )
+        fraction_dot_50_perc = always_redraw(
+            lambda: Dot(point=phase_fraction_axes.c2p(time_it_takes_50_perc.get_value(), 0.5),
+                        color=YELLOW)
+        )
+        ttt_dot_50_perc = always_redraw(
+            lambda: Dot(point=ttt_axes.c2p(time_it_takes_50_perc.get_value(), temp_proxy_tracker.get_value() + 1),
+                        color=YELLOW)
+        )
+        ttt_dot_50_perc_path = TracedPath(ttt_dot_50_perc.get_center, stroke_color=YELLOW, stroke_width=4)
+
+        self.add(time_it_takes_50_perc)
+        self.play(Create(fraction_line_horizontal_50_perc))
+        self.play(Create(fraction_dot_50_perc))
+        self.play(Create(fraction_line_vertical_50_perc))
+        self.play(Create(ttt_dot_50_perc))
+        self.add(ttt_dot_50_perc_path)
+
+        time_it_takes_99_perc = ValueTracker(np.power(
+            - 3 * np.log(1 - 0.99) / (np.pi * nucleation_rate.get_value() * (growth_rate.get_value() ** 3)), 0.25
+        )).add_updater(lambda num: num.set_value(np.power(
+            - 3 * np.log(1 - 0.99) / (np.pi * nucleation_rate.get_value() * (growth_rate.get_value() ** 3)), 0.25)))
+        fraction_line_horizontal_99_perc = always_redraw(
+            lambda: DashedLine(
+                start=phase_fraction_axes.c2p(0, 0.99),
+                end=phase_fraction_axes.c2p(time_it_takes_99_perc.get_value(), 0.99),
+                color=RED
+            )
+        )
+        fraction_line_vertical_99_perc = always_redraw(
+            lambda: DashedLine(
+                start=phase_fraction_axes.c2p(time_it_takes_99_perc.get_value(), 0.99),
+                end=ttt_axes.c2p(time_it_takes_99_perc.get_value(), temp_proxy_tracker.get_value() + 1),
+                color=RED
+            )
+        )
+        fraction_dot_99_perc = always_redraw(
+            lambda: Dot(point=phase_fraction_axes.c2p(time_it_takes_99_perc.get_value(), 0.99),
+                        color=RED)
+        )
+        ttt_dot_99_perc = always_redraw(
+            lambda: Dot(point=ttt_axes.c2p(time_it_takes_99_perc.get_value(), temp_proxy_tracker.get_value() + 1),
+                        color=RED)
+        )
+        ttt_dot_99_perc_path = TracedPath(ttt_dot_99_perc.get_center, stroke_color=RED, stroke_width=4)
+
+        self.add(time_it_takes_99_perc)
+        self.play(Create(fraction_line_horizontal_99_perc))
+        self.play(Create(fraction_dot_99_perc))
+        self.play(Create(fraction_line_vertical_99_perc))
+        self.play(Create(ttt_dot_99_perc))
+        self.add(ttt_dot_99_perc_path)
+
+        ttt_temperature_line = always_redraw(
+            lambda: DashedLine(
+                start=ttt_axes.c2p(0, temp_proxy_tracker.get_value() + 1),
+                end=ttt_axes.c2p(ttt_axes.x_range[1], temp_proxy_tracker.get_value() + 1)
+            )
+        )
+        self.play(Create(ttt_temperature_line))
         self.wait()
 
+        self.play(
+            temp_proxy_tracker.animate(run_time=animation_duration, rate_func=smooth).set_value(animation_duration))
+        self.wait()
 
 
 class TwoPhaseTimeCone(Scene):
@@ -1479,7 +1659,7 @@ class TwoPhaseTimeCone(Scene):
                     green_x_tracker.get_value() + green_t_tracker.get_value() * orange_phase_growth_rate_tracker.get_value(),
                     0),
                 axes.c2p(orange_phase_growth_rate_tracker.get_value() * (
-                            green_t_tracker.get_value() - green_x_tracker.get_value() / green_phase_growth_rate_tracker.get_value()),
+                        green_t_tracker.get_value() - green_x_tracker.get_value() / green_phase_growth_rate_tracker.get_value()),
                          0)
             ).set_stroke(color=BLUE, opacity=0.6).set_fill(color=BLUE, opacity=0.3)
         )
@@ -1488,7 +1668,7 @@ class TwoPhaseTimeCone(Scene):
         self.wait()
         self.play(
             orange_x_tracker.animate.set_value(orange_phase_growth_rate_tracker.get_value() * (
-                        green_t_tracker.get_value() - green_x_tracker.get_value() / green_phase_growth_rate_tracker.get_value()) - 0.1),
+                    green_t_tracker.get_value() - green_x_tracker.get_value() / green_phase_growth_rate_tracker.get_value()) - 0.1),
             orange_t_tracker.animate.set_value(0), run_time=2
         )
         self.play(
