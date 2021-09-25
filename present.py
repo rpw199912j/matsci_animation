@@ -1086,6 +1086,7 @@ class PhaseFractionToTTT(Scene):
             }
         )
 
+        phase_fraction_axes.shift(LEFT * 0.5)
         phase_fraction_axes.to_edge(UP, buff=0.5)
 
         phase_fraction_x_label = phase_fraction_axes.get_x_axis_label(Tex("$t$"))
@@ -1104,6 +1105,7 @@ class PhaseFractionToTTT(Scene):
             }
         )
 
+        ttt_axes.shift(LEFT * 0.5)
         ttt_axes.to_edge(DOWN, buff=0.1)
 
         ttt_x_label = ttt_axes.get_x_axis_label(Tex("$t$"))
@@ -1140,12 +1142,19 @@ class PhaseFractionToTTT(Scene):
 
         nucleation_rate_text = Tex(
             "$J$: "
-        ).next_to(phase_fraction_axes, RIGHT, buff=0.5).shift(UP)
+        ).next_to(phase_fraction_axes, RIGHT, buff=0.4).shift(UP)
 
         nucleation_rate_value = always_redraw(
             lambda: DecimalNumber(num_decimal_places=1).set_value(
                 nucleation_rate.get_value() * 1e4).next_to(nucleation_rate_text)
         )
+
+        scale_factor_nucleation = Tex(
+            "$\\times 10^{-4}$"
+        )
+        scale_factor_nucleation.add_updater(lambda x: x.next_to(nucleation_rate_value, RIGHT, buff=0.1).align_to(
+            nucleation_rate_value, DOWN
+        ))
 
         growth_rate_text = Tex(
             "$\\dot{R}$: "
@@ -1157,6 +1166,13 @@ class PhaseFractionToTTT(Scene):
                 growth_rate_text.get_bottom(), DOWN).align_to(nucleation_rate_value, LEFT)
         )
 
+        scale_factor_growth_rate = Tex(
+            "$\\times 10^{-4}$"
+        )
+        scale_factor_growth_rate.add_updater(lambda x: x.next_to(growth_rate_value, RIGHT, buff=0.1).align_to(
+            growth_rate_value, DOWN
+        ))
+
         self.play(Create(phase_fraction_axes))
         self.play(Write(phase_fraction_x_label), Write(phase_fraction_y_label))
         self.wait()
@@ -1165,8 +1181,8 @@ class PhaseFractionToTTT(Scene):
         self.play(Write(ttt_x_label), Write(ttt_y_label))
         self.wait()
 
-        self.play(Write(VGroup(nucleation_rate_text, nucleation_rate_value,
-                               growth_rate_text, growth_rate_value)))
+        self.play(Write(VGroup(nucleation_rate_text, nucleation_rate_value, scale_factor_nucleation,
+                               growth_rate_text, growth_rate_value, scale_factor_growth_rate)))
         self.play(Create(fraction_curve), run_time=3)
         self.wait()
 
@@ -1306,7 +1322,8 @@ class PhaseFractionToTTT(Scene):
         ttt_temperature_line = always_redraw(
             lambda: DashedLine(
                 start=ttt_axes.c2p(0, temp_proxy_tracker.get_value() + 1),
-                end=ttt_axes.c2p(ttt_axes.x_range[1], temp_proxy_tracker.get_value() + 1)
+                end=ttt_axes.c2p(ttt_axes.x_range[1], temp_proxy_tracker.get_value() + 1),
+                stroke_opacity=0.6
             )
         )
         self.play(Create(ttt_temperature_line))
