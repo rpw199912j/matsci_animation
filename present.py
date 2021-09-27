@@ -1,5 +1,6 @@
 import numpy as np
 from manim import *
+from rigid_mechanics_manim_physics import *
 
 DOT_TO_LINE = 200
 
@@ -465,6 +466,103 @@ class ConnectTimeConeWithPhaseFraction(Scene):
             Transform(page_5, page_6),
         )
         self.wait()
+
+
+class ProbToPhaseFraction(SpaceScene):
+    def construct(self):
+        sampling_box_axes = Axes(
+            x_range=[0, 10],
+            y_range=[0, 10],
+            x_length=6,
+            y_length=6,
+            y_axis_config={
+                "numbers_to_include": np.arange(0, 10 + 1, 1)
+            },
+            tips=False
+        )
+
+        grid_dimension_x = sampling_box_axes.x_range[1]
+        grid_dimension_y = sampling_box_axes.y_range[1]
+
+        bounding_box_left = Line(
+            start=sampling_box_axes.c2p(0, grid_dimension_y),
+            end=sampling_box_axes.c2p(0, 0)
+        )
+        bounding_box_bottom = Line(
+            start=sampling_box_axes.c2p(0, 0),
+            end=sampling_box_axes.c2p(grid_dimension_x, 0)
+        )
+        bounding_box_right = Line(
+            start=sampling_box_axes.c2p(grid_dimension_x, 0),
+            end=sampling_box_axes.c2p(grid_dimension_x, grid_dimension_y)
+        )
+        bounding_box = VGroup(bounding_box_left, bounding_box_bottom, bounding_box_right)
+
+        self.add(sampling_box_axes, bounding_box)
+        self.wait()
+
+        # add a 10*10 grid of random numbers in the range of [0, 1)
+        rng = np.random.default_rng(0)  # use a seeded random number generator to ensure reproducibility
+        random_num_grid = rng.uniform(size=(grid_dimension_x, grid_dimension_y))
+        # for each random number, determine if it is greater than the probability threshold
+        # if higher than the threshold, desiganate this point as transformed
+        prob_untransformed = 0.2
+        transformed_grid = (random_num_grid >= prob_untransformed)
+
+        # create a grid of white dots at those points which are transformed
+        transformed_dot_lst = [Dot(point=sampling_box_axes.c2p(row_index + 0.5, col_index + 0.5),
+                                   radius=(sampling_box_axes.c2p(0.5, 0) - sampling_box_axes.c2p(0, 0))[0])
+                               for row_index in range(grid_dimension_x) for col_index in range(grid_dimension_y)
+                               if transformed_grid[row_index][col_index]]
+
+        count_tracker = ValueTracker(0)
+        count_tracker_label = always_redraw(
+            lambda: Integer(count_tracker.get_value()).next_to(bounding_box, RIGHT, buff=1)
+        )
+        num_of_dots = len(transformed_dot_lst)
+        count_perc_eqn = MathTex(
+            r"\frac{}{100}",
+            r"={num_dots}\%".format(num_dots=num_of_dots),
+            arg_separator=""
+        )
+        count_perc_eqn.align_to(count_tracker_label, UL).shift(
+            np.array([(count_tracker_label.get_top() - count_perc_eqn.submobjects[0].get_top())[0]*0.7,
+                      0, 0])
+        ).shift(
+            np.array([0,
+                      (count_perc_eqn.submobjects[0].get_center() - count_tracker_label.get_center())[1]*0.8,
+                      0])
+        )
+
+        self.play(LaggedStart(
+            *[FadeIn(dot) for dot in transformed_dot_lst],
+            lag_ratio=0.01
+        ))
+        self.wait()
+        self.play(Write(count_tracker_label))
+
+        self.play(
+            LaggedStart(
+                *[ShowPassingFlash(Circle().surround(dot, buffer_factor=1.1).set_color(YELLOW), time_width=2)
+                  for dot in transformed_dot_lst],
+                lag_ratio=0.05, run_time=4),
+            count_tracker.animate(run_time=4, rate_func=linear).set_value(num_of_dots)
+        )
+        self.wait()
+        self.play(Write(count_perc_eqn))
+        self.wait()
+
+        transformed_fraction_fill_line = DashedLine(
+            start=sampling_box_axes.c2p(0, 10 * (1 - prob_untransformed)),
+            end=sampling_box_axes.c2p(grid_dimension_x, 10 * (1 - prob_untransformed)),
+            stroke_color=YELLOW
+        )
+        self.play(Create(transformed_fraction_fill_line))
+        self.wait()
+
+        self.make_static_body(bounding_box)
+        self.make_rigid_body(*transformed_dot_lst)
+        self.wait(8)
 
 
 # noinspection DuplicatedCode
@@ -1091,7 +1189,7 @@ class PhaseFractionToTTT(Scene):
 
         phase_fraction_x_label = phase_fraction_axes.get_x_axis_label(Tex("$t$"))
         phase_fraction_y_label = phase_fraction_axes.get_y_axis_label(
-            Tex("$f_{\\text{transformed}}$").scale(0.7).rotate(PI/2),
+            Tex("$f_{\\text{transformed}}$").scale(0.7).rotate(PI / 2),
             edge=LEFT, direction=LEFT, buff=0.4
         )
 
