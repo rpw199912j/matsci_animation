@@ -17,6 +17,7 @@ by plotting the (volume) phase fraction transformed as a function of time at dif
 ### Convert probability at a single point to overall phase fraction
 ![](./media/videos/present/720p30/ProbToPhaseFraction_ManimCE_v0.10.0.gif)
 [[Source code here]](https://github.com/rpw199912j/matsci_animation/blob/master/present.py#L471)
+
 This animation shows, at an arbitrary time, how we can get the overall phase fraction transformed/untransformed by sampling the
 probability of being transformed/untransformed at multiple points in space. 
 Here I assume the material undergoing the phase transformation is nucleating and growing on a 2D plane. 
