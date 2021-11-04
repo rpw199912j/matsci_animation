@@ -1756,7 +1756,7 @@ class TwoPhaseTimeCone(Scene):
 
         inverted_time_cone_green_poi_right = always_redraw(
             lambda: DashedVMobject(
-                axes.get_graph(
+                axes.plot(
                     lambda x: -(1 / green_phase_growth_rate_tracker.get_value()) * (
                             x - axes.p2c(point_of_interest.get_center())[0]) + axes.p2c(point_of_interest.get_center())[
                                   1],
