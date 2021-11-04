@@ -1504,7 +1504,7 @@ class PhaseFractionToTTT(Scene):
 
         fraction_curve = always_redraw(
             lambda:
-            phase_fraction_axes.get_graph(
+            phase_fraction_axes.plot(
                 lambda t: 1 - np.exp(
                     -np.pi / 3 * nucleation_rate.get_value() * (growth_rate.get_value() ** 3) * (t ** 4))
             )
