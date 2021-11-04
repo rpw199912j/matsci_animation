@@ -31,7 +31,128 @@ class IntroSlide(Scene):
         self.wait(1)
         self.play(FadeOut(logo), FadeOut(name), FadeOut(affiliation), title.animate.shift(DOWN * 1.2), run_time=2)
         self.wait(1)
-        self.play(title.animate.set_color_by_t2c(t2c={"[8:22]": BLUE, "[29:-1]": RED}), run_time=1)
+        self.play(title.animate.set_color_by_t2c(t2c={"[8:23]": BLUE, "[28:-1]": RED}), run_time=1)
+        self.wait()
+
+
+class PhysicalPic(Scene):
+    def construct(self):
+        rectangle = ScreenRectangle()
+        rectangle_mask = ScreenRectangle(stroke_width=200, stroke_color=BLACK, height=6, aspect_ratio=4 * 20.5 / 9 / 6)
+
+        circles = [Circle(color=YELLOW, fill_color=YELLOW, fill_opacity=1, radius=1E-6, arc_center=shift_vec)
+                   for shift_vec in [UR+0.5*RIGHT, 2*UL, -0.5*LEFT, DR+RIGHT, DL+LEFT]]
+
+        phase_fraction_axes = Axes(
+            x_range=[0, 1000, 100],
+            y_range=[0, 1.2, 0.2],
+            x_length=7,
+            y_length=3,
+            y_axis_config={
+                "numbers_to_include": np.arange(0, 1 + 0.2, 0.2)
+            }
+        )
+
+        phase_fraction_axes.to_edge(DOWN, buff=0.01)
+
+        phase_fraction_x_label = phase_fraction_axes.get_x_axis_label(Tex("$t$"))
+        phase_fraction_y_label = phase_fraction_axes.get_y_axis_label(
+            Tex("$f_{\\text{transformed}}$").scale(0.7).rotate(PI / 2),
+            edge=LEFT, direction=LEFT, buff=0.4
+        )
+
+        fraction_curve = phase_fraction_axes.plot(
+            lambda t: 1 - np.exp(
+                -np.pi / 3 * 0.012 * (0.001 ** 3) * (t ** 4)),
+            color=YELLOW
+        )
+
+        jmak_formula_1 = Tex(
+            "$f_{\\text{transformed}}$", color=YELLOW
+        )
+        jmak_formula_2 = Tex(
+            "$=1-e^{-\\frac{\\pi}{3}J\\dot{R}^3t^4}$", color=YELLOW
+        )
+
+        jmak_formula_1.shift(4.5 * RIGHT + UP)
+        jmak_formula_2.align_to(jmak_formula_1, LEFT).next_to(jmak_formula_1, DOWN)
+
+        jmak_formula = VGroup(jmak_formula_1, jmak_formula_2)
+        jmak_label = Tex(
+            "JMAK Equation"
+        ).next_to(jmak_formula, UP)
+
+        nucleation_rate = Tex(
+            "$J:\\,$", "nucleation rate", font_size=40
+        ).next_to(jmak_formula, DOWN, buff=LARGE_BUFF)
+        growth_rate = Tex(
+            "$\\dot{R}:\\,$", "growth rate", font_size=40
+        ).next_to(nucleation_rate, DOWN).align_to(nucleation_rate, LEFT)
+
+        self.add(*circles)
+        self.add_foreground_mobjects(rectangle, rectangle_mask)
+        self.play(
+            LaggedStart(
+                *[circle.animate(rate_func=linear, run_time=5).scale(3E6) for circle in circles],
+                lag_ratio=0.1
+            )
+        )
+        self.wait()
+
+        self.play(
+            LaggedStart(
+                *[circle.animate(rate_func=linear, run_time=1).scale(1/3E6) for circle in circles[::-1]],
+                lag_ratio=0.1
+            )
+        )
+        self.wait()
+
+        self.play(
+            *[obj.animate.shift(2*UP) for obj in [*circles, rectangle, rectangle_mask]]
+        )
+        self.wait()
+
+        self.add_foreground_mobjects(phase_fraction_axes, phase_fraction_x_label, phase_fraction_y_label)
+        self.play(Create(phase_fraction_axes), Write(phase_fraction_x_label), Write(phase_fraction_y_label),
+                  run_time=2)
+        self.wait()
+
+        self.add_foreground_mobjects(fraction_curve)
+        self.play(
+            LaggedStart(
+                *[circle.animate(rate_func=linear, run_time=5).scale(2.6E6) for circle in circles],
+                lag_ratio=0.1
+            ),
+            Create(fraction_curve, rate_func=linear, run_time=6)
+        )
+        self.wait()
+
+        self.play(
+            *[obj.animate.shift(2*LEFT) for obj in self.mobjects]
+        )
+        self.wait()
+
+        self.add_foreground_mobjects(jmak_label)
+        self.play(Write(jmak_label))
+        self.wait()
+
+        self.add_foreground_mobjects(jmak_formula_1, jmak_formula_2)
+        self.play(
+            LaggedStart(
+                Write(jmak_formula_1), Write(jmak_formula_2),
+                lag_ratio=1
+            )
+        )
+        self.wait()
+
+        self.add_foreground_mobjects(nucleation_rate, growth_rate)
+        self.play(
+            LaggedStart(
+                Write(nucleation_rate),
+                Write(growth_rate),
+                lag_ratio=1.1
+            )
+        )
         self.wait()
 
 
