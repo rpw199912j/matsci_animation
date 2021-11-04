@@ -616,7 +616,14 @@ class ConnectTimeConeWithPhaseFraction(Scene):
         self.wait()
 
 
-class ProbToPhaseFraction(SpaceScene):
+class ProbToPhaseFraction(ZoomedScene, SpaceScene):
+    def __init__(self):
+        ZoomedScene.__init__(
+            self,
+            zoomed_display_width=5,
+            zoomed_display_height=5
+        )
+
     def construct(self):
         sampling_box_axes = Axes(
             x_range=[0, 10],
@@ -649,6 +656,92 @@ class ProbToPhaseFraction(SpaceScene):
         self.add(sampling_box_axes, bounding_box)
         self.wait()
 
+        # add the grid lines
+        grid_lines_vertical = [Line(
+            start=sampling_box_axes.c2p(_, 0), end=sampling_box_axes.c2p(_, 10), stroke_opacity=0.3
+        ) for _ in range(1, 10)]
+        grid_lines_horizontal = [Line(
+            start=sampling_box_axes.c2p(0, _), end=sampling_box_axes.c2p(10, _), stroke_opacity=0.3
+        ) for _ in range(1, 11)]
+
+        self.play(
+            LaggedStart(
+                *[Create(grid_line) for grid_line in grid_lines_vertical],
+                lag_ratio=0.2
+            ),
+            run_time=1
+        )
+        self.play(
+            LaggedStart(
+                *[Create(grid_line) for grid_line in grid_lines_horizontal],
+                lag_ratio=0.2
+            ),
+            run_time=1
+        )
+        self.wait()
+
+        # add the zoomed scene
+        zoomed_camera = self.zoomed_camera
+        zoomed_display = self.zoomed_display
+        zoomed_camera_frame = zoomed_camera.frame
+        zoomed_display_frame = zoomed_display.display_frame
+
+        zoomed_camera_frame.set_color(YELLOW)
+        zoomed_display_frame.set_color(YELLOW)
+        zoomed_camera_frame.move_to(
+            sampling_box_axes.c2p(4.5, 5.5)
+        )
+
+        self.play(
+            Create(zoomed_camera_frame),
+        )
+        self.activate_zooming()
+        self.play(
+            self.get_zoomed_display_pop_out_animation()
+        )
+        self.wait()
+
+        # add the dot
+        demo_dot = Dot(point=sampling_box_axes.c2p(4.5, 5.5),
+                       radius=(sampling_box_axes.c2p(0.5, 0) - sampling_box_axes.c2p(0, 0))[0])
+        self.play(
+            FadeIn(demo_dot)
+        )
+        self.wait()
+        # remove the dot
+        self.play(
+            FadeOut(demo_dot)
+        )
+        self.wait()
+
+        # reverse zooming
+        self.play(
+            self.get_zoomed_display_pop_out_animation(),
+            rate_func=lambda t: smooth(1-t)
+        )
+        self.wait()
+
+        self.play(
+            FadeOut(zoomed_camera_frame, zoomed_display_frame)
+        )
+        self.remove(
+            self.zoomed_camera.frame,
+            self.zoomed_display.display_frame,
+            self.zoomed_display
+        )
+        self.zoom_activated = False
+        self.wait()
+
+        self.play(
+            LaggedStart(
+                *[FadeOut(grid_line) for grid_line in grid_lines_horizontal[::-1]],
+                *[FadeOut(grid_line) for grid_line in grid_lines_vertical[::-1]],
+                lag_ratio=0.2
+            ),
+            run_time=1
+        )
+        self.wait()
+
         # add a 10*10 grid of random numbers in the range of [0, 1)
         rng = np.random.default_rng(0)  # use a seeded random number generator to ensure reproducibility
         random_num_grid = rng.uniform(size=(grid_dimension_x, grid_dimension_y))
@@ -674,11 +767,11 @@ class ProbToPhaseFraction(SpaceScene):
             arg_separator=""
         )
         count_perc_eqn.align_to(count_tracker_label, UL).shift(
-            np.array([(count_tracker_label.get_top() - count_perc_eqn.submobjects[0].get_top())[0]*0.7,
+            np.array([(count_tracker_label.get_top() - count_perc_eqn.submobjects[0].get_top())[0] * 0.7,
                       0, 0])
         ).shift(
             np.array([0,
-                      (count_perc_eqn.submobjects[0].get_center() - count_tracker_label.get_center())[1]*0.8,
+                      (count_perc_eqn.submobjects[0].get_center() - count_tracker_label.get_center())[1] * 0.8,
                       0])
         )
 
