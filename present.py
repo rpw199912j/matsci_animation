@@ -171,10 +171,24 @@ class Motivation(Scene):
         self.wait()
 
         motivation_statement = Tex(
-            "In predictive synthesis, we want to know what is\\\\the optimal processing pathway\\\\to transition from a precursor phase to a desired phase?",
+            "In predictive synthesis, we want to know what is\\\\the ",
+            "optimal thermal processing pathway\\\\",
+            "to transition from", " a precursor phase ", "to ", "a target phase", "?",
             font_size=45
         )
+        motivation_statement.set_color_by_tex_to_color_map({"optimal thermal processing pathway": YELLOW,
+                                                            "a precursor phase": PURPLE_C,
+                                                            "a target phase": ORANGE})
         motivation_statement.shift(UP * 2)
+
+        precursor_phase_a = Tex(
+            "A", font_size=45, color=PURPLE_C
+        )
+        precursor_phase_a.shift(3.2 * RIGHT + 2.2 * DOWN)
+        target_phase_b = Tex(
+            "B", font_size=45, color=ORANGE
+        )
+        target_phase_b.shift(5 * RIGHT + 2.2 * DOWN)
 
         self.play(Write(motivation_statement), run_time=3)
         self.wait()
@@ -183,12 +197,16 @@ class Motivation(Scene):
         ttt_diagram.scale(1.2)
         ttt_diagram.to_edge(RIGHT, buff=0.6).shift(DOWN * 1.7)
         ttt_diagram_label = Tex(
-            "Time-Temperature-Transition Diagram", font_size=30
+            "Time-Temperature-Transformation Diagram", font_size=25
         )
         ttt_diagram_label.next_to(ttt_diagram, UP)
-        ttt_diagram_line = Line(
+        ttt_diagram_line_2 = Line(
             LEFT * 1.5, RIGHT * 1.5
-        ).set_color(RED).move_to(ttt_diagram.get_center()).shift(UP * 0.09)
+        ).set_color(RED).move_to(ttt_diagram.get_center()).shift(UP * 0.09 + RIGHT * 0.05)
+        ttt_diagram_line_1 = Line(
+            start=ttt_diagram.get_corner(UL)+0.62*DR,
+            end=ttt_diagram_line_2.get_left()
+        ).set_color(RED)
 
         phase_fraction = ImageMobject("./figure/phase_fraction.png")
         phase_fraction.scale(1.2)
@@ -224,7 +242,15 @@ class Motivation(Scene):
 
         self.play(FadeIn(ttt_diagram), Write(ttt_diagram_label))
         self.wait()
-        self.play(Create(ttt_diagram_line))
+
+        self.play(
+            Transform(motivation_statement[3].copy(), precursor_phase_a),
+            Transform(motivation_statement[5].copy(), target_phase_b),
+        )
+        self.wait()
+
+        self.play(Create(ttt_diagram_line_1))
+        self.play(Create(ttt_diagram_line_2))
         self.wait()
 
         self.play(Create(arrow_1))
