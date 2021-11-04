@@ -310,10 +310,10 @@ class TimeCone1D2D(ThreeDScene):
         dot = Dot(radius=line.stroke_width / DOT_TO_LINE)
         dot.move_to(line.get_center())
 
-        growth_cone_graph_left = axes.get_graph(
+        growth_cone_graph_left = axes.plot(
             lambda x: -5 * (x - 3), x_range=[2, 3]
         )
-        growth_cone_graph_right = axes.get_graph(
+        growth_cone_graph_right = axes.plot(
             lambda x: 5 * (x - 3), x_range=[3, 4]
         )
         growth_cones_1d = VGroup(growth_cone_graph_left, growth_cone_graph_right)
