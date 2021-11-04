@@ -1444,7 +1444,8 @@ class PhaseFractionToTTT(Scene):
             x_length=8,
             y_length=2,
             y_axis_config={
-                "numbers_to_include": np.arange(0, 1 + 0.2, 0.2)
+                "numbers_to_include": [0.1, 0.5, 0.99],
+                "include_ticks": False
             }
         )
 
@@ -1456,6 +1457,13 @@ class PhaseFractionToTTT(Scene):
             Tex("$f_{\\text{transformed}}$").scale(0.7).rotate(PI / 2),
             edge=LEFT, direction=LEFT, buff=0.4
         )
+
+        phase_fraction_y_axis = phase_fraction_axes.y_axis
+        ticks = VGroup()
+        for _ in [0.1, 0.5, 0.99]:
+            ticks.add(phase_fraction_y_axis.get_tick(_, phase_fraction_y_axis.tick_size))
+        phase_fraction_y_axis.add(ticks)
+        phase_fraction_y_axis.ticks = ticks
 
         ttt_axes = Axes(
             x_range=[0, 1000, 100],
