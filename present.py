@@ -1200,6 +1200,9 @@ class CalcTimeConeVolume(ThreeDScene):
         circle_lst = [circle.shift(axes.c2p(point_of_interest_x, 0, num))
                       for num, circle in enumerate(circle_lst)]
 
+        sphere_lst = [Sphere(center=circle.get_center(), radius=circle.radius, fill_opacity=0.6,).set_color(RED)
+                      for circle in circle_lst]
+
         self.play(FadeIn(*circle_lst))
         self.wait()
 
@@ -1213,6 +1216,26 @@ class CalcTimeConeVolume(ThreeDScene):
 
         self.add_fixed_in_frame_mobjects(alter_time_cone_2d_area_eqn)
         self.play(Write(alter_time_cone_2d_area_eqn))
+        self.wait()
+
+        self.play(
+            Uncreate(cone_2d_space_time)
+        )
+        self.wait()
+        self.play(
+            LaggedStart(
+                AnimationGroup(
+                    *[Rotate(circle, angle=PI, axis=Y_AXIS) for circle in circle_lst]
+                ),
+                AnimationGroup(
+                    FadeIn(*sphere_lst)
+                ),
+                lag_ratio=0.1
+            )
+        )
+        self.play(
+            FadeOut(*circle_lst)
+        )
         self.wait()
 
         alter_time_cone_3d_area_eqn = MathTex(
