@@ -368,11 +368,11 @@ def create_single_growth_cone_with_shade(axes,
                                          growth_cone_tip_x, growth_cone_tip_y,
                                          growth_cone_base_radius, growth_cone_height,
                                          shade_opacity=0.5):
-    growth_cone_graph_left = axes.get_graph(
+    growth_cone_graph_left = axes.plot(
         lambda x: -growth_cone_height / growth_cone_base_radius * (x - growth_cone_tip_x) + growth_cone_tip_y,
         x_range=[growth_cone_tip_x - growth_cone_base_radius, growth_cone_tip_x]
     )
-    growth_cone_graph_right = axes.get_graph(
+    growth_cone_graph_right = axes.plot(
         lambda x: growth_cone_height / growth_cone_base_radius * (x - growth_cone_tip_x) + growth_cone_tip_y,
         x_range=[growth_cone_tip_x, growth_cone_tip_x + growth_cone_base_radius]
     )
@@ -1204,7 +1204,7 @@ class SinglePhaseFraction(Scene):
         t_valuetracker = ValueTracker(0)
         fraction_curve = always_redraw(
             lambda:
-            axes.get_graph(
+            axes.plot(
                 lambda t: 1 - np.exp(
                     -np.pi / 3 * nucleation_rate.get_value() * (growth_rate.get_value() ** 3) * (t ** 4)),
                 x_range=[0, t_valuetracker.get_value()],
@@ -1591,7 +1591,7 @@ class TwoPhaseTimeCone(Scene):
 
         inverted_time_cone_green_poi_left = always_redraw(
             lambda: DashedVMobject(
-                axes.get_graph(
+                axes.plot(
                     lambda x: (1 / green_phase_growth_rate_tracker.get_value()) * (
                             x - axes.p2c(point_of_interest.get_center())[0]) + axes.p2c(point_of_interest.get_center())[
                                   1],
@@ -1624,7 +1624,7 @@ class TwoPhaseTimeCone(Scene):
 
         inverted_time_cone_orange_poi_left = always_redraw(
             lambda: DashedVMobject(
-                axes.get_graph(
+                axes.plot(
                     lambda x: (1 / orange_phase_growth_rate_tracker.get_value()) * (
                             x - axes.p2c(point_of_interest.get_center())[0]) + axes.p2c(point_of_interest.get_center())[
                                   1],
@@ -1639,7 +1639,7 @@ class TwoPhaseTimeCone(Scene):
 
         inverted_time_cone_orange_poi_right = always_redraw(
             lambda: DashedVMobject(
-                axes.get_graph(
+                axes.plot(
                     lambda x: -(1 / orange_phase_growth_rate_tracker.get_value()) * (
                             x - axes.p2c(point_of_interest.get_center())[0]) + axes.p2c(point_of_interest.get_center())[
                                   1],
@@ -1702,7 +1702,7 @@ class TwoPhaseTimeCone(Scene):
 
         time_cone_orange_left = always_redraw(
             lambda:
-            axes.get_graph(
+            axes.plot(
                 lambda x: -(1 / orange_phase_growth_rate_tracker.get_value()) * (
                         x - orange_x_tracker.get_value()) + orange_t_tracker.get_value(),
                 color=ORANGE,
@@ -1712,7 +1712,7 @@ class TwoPhaseTimeCone(Scene):
 
         time_cone_orange_right = always_redraw(
             lambda:
-            axes.get_graph(
+            axes.plot(
                 lambda x: (1 / orange_phase_growth_rate_tracker.get_value()) * (
                         x - orange_x_tracker.get_value()) + orange_t_tracker.get_value(),
                 color=ORANGE,
@@ -1753,7 +1753,7 @@ class TwoPhaseTimeCone(Scene):
 
         time_cone_green_left = always_redraw(
             lambda:
-            axes.get_graph(
+            axes.plot(
                 lambda x: -(1 / green_phase_growth_rate_tracker.get_value()) * (
                         x - green_x_tracker.get_value()) + green_t_tracker.get_value(),
                 color=GREEN,
@@ -1763,7 +1763,7 @@ class TwoPhaseTimeCone(Scene):
 
         time_cone_green_right = always_redraw(
             lambda:
-            axes.get_graph(
+            axes.plot(
                 lambda x: (1 / green_phase_growth_rate_tracker.get_value()) * (
                         x - green_x_tracker.get_value()) + green_t_tracker.get_value(),
                 color=GREEN,
