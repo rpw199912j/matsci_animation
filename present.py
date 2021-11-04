@@ -8,7 +8,7 @@ DOT_TO_LINE = 200
 class IntroSlide(Scene):
     def construct(self):
         # title
-        title = Text("Using the Time Cone Method to\nModel Competitive Phase Transformation", font_size=50)
+        title = Text("Deriving the JMAK Equation Using\nthe Time Cone Method", font_size=50)
         title.shift(UP * 1.2)
 
         # umich_mse_logo
@@ -18,8 +18,9 @@ class IntroSlide(Scene):
 
         # name and affiliation
         name = Text("Peiwen Ren", font_size=40, slant=ITALIC)
-        affiliation = Text("Sun Research Group\nUniversity of Michigan\nMaterials Science and Engineering\n09/23/2021",
-                           font_size=30)
+        affiliation = Text(
+            "Visiting Student\nWenhao Sun Research Group\nUniversity of Michigan\nMaterials Science and Engineering",
+            font_size=30)
         name.next_to(logo, RIGHT).align_to(logo, UP)
         affiliation.next_to(name, DOWN).align_to(name, LEFT)
 
@@ -29,7 +30,7 @@ class IntroSlide(Scene):
 
         self.add(title, logo, name, affiliation, page_1)
         self.wait(1)
-        self.play(FadeOut(logo), FadeOut(name), FadeOut(affiliation), title.animate.shift(DOWN * 1.2), run_time=2)
+        self.play(FadeOut(logo), FadeOut(name), FadeOut(affiliation), title.animate.shift(DOWN * 1.2), run_time=1)
         self.wait(1)
         self.play(title.animate.set_color_by_t2c(t2c={"[8:23]": BLUE, "[28:-1]": RED}), run_time=1)
         self.wait()
