@@ -1872,7 +1872,7 @@ class TwoPhaseTimeCone(Scene):
 
         time_cone_orange = VGroup(time_cone_orange_left, time_cone_orange_right)
 
-        # TODO: polygon vertices always in 3D
+        # AHA: polygon vertices always in 3D
         orange_phase_allowed_region = always_redraw(
             lambda: Polygon(
                 point_of_interest.get_center(),
