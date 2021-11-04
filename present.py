@@ -1439,8 +1439,8 @@ class PhaseFractionToTTT(Scene):
         animation_duration = 5
 
         phase_fraction_axes = Axes(
-            x_range=[0, 1000, 100],
-            y_range=[0, 1.2, 0.2],
+            x_range=[0, 1100, 100],
+            y_range=[0, 1.3, 0.01],
             x_length=8,
             y_length=2,
             y_axis_config={
@@ -1466,7 +1466,7 @@ class PhaseFractionToTTT(Scene):
         phase_fraction_y_axis.ticks = ticks
 
         ttt_axes = Axes(
-            x_range=[0, 1000, 100],
+            x_range=[0, 1100, 100],
             y_range=[0, animation_duration + 2, 1],
             x_length=8,
             y_length=4,
