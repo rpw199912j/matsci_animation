@@ -170,6 +170,21 @@ class Motivation(Scene):
         self.add(slide_title, page_2)
         self.wait()
 
+        problem_statement_1 = Tex(
+            "What", " to ", "make", "?"
+        )
+        problem_statement_2 = Tex(
+            "How", " to ", "make", " them", "?"
+        )
+        problem_statement_2.align_to(problem_statement_1, LEFT)
+        problem_statement_2.shift(problem_statement_1[1].get_center()-problem_statement_2[1].get_center())
+        self.play(Write(problem_statement_1))
+        self.wait()
+        self.play(TransformMatchingTex(problem_statement_1, problem_statement_2, transform_mismatches=True))
+        self.wait()
+        self.play(FadeOut(problem_statement_2))
+        self.wait()
+
         motivation_statement = Tex(
             "In predictive synthesis, we want to know what is\\\\the ",
             "optimal thermal processing pathway\\\\",
