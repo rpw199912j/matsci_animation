@@ -1350,7 +1350,7 @@ class CalcTimeConeVolume(ThreeDScene):
 class SinglePhaseFraction(Scene):
     def construct(self):
         slide_title = Tex(
-            "Phase fraction transformed as a function of time (single-phase)",
+            "Phase fraction transformed as a function of time",
             font_size=40)
         slide_title.to_corner(UL)
 
