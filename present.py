@@ -296,6 +296,29 @@ class TimeCone1D2D(ThreeDScene):
         self.add_fixed_in_frame_mobjects(slide_title, page_3)
         self.wait()
 
+        john_cahn_image = ImageMobject("./figure/john_cahn_image.jpg")
+        john_cahn_image.scale(1.5)
+        john_cahn_image.to_edge(LEFT, buff=3*DEFAULT_MOBJECT_TO_EDGE_BUFFER)
+
+        john_cahn_image_caption = Tex(
+            r"John W. Cahn\\(1928-2016)"
+        )
+        john_cahn_image_caption.next_to(john_cahn_image, DOWN)
+
+        time_cone_paper = ImageMobject("./figure/time_cone_paper.png")
+        time_cone_paper.scale(0.6)
+        time_cone_paper.to_edge(RIGHT, buff=2*DEFAULT_MOBJECT_TO_EDGE_BUFFER)
+
+        self.play(FadeIn(john_cahn_image))
+        self.play(Write(john_cahn_image_caption))
+        self.wait()
+        self.play(FadeIn(time_cone_paper))
+        self.wait()
+        self.play(
+            FadeOut(john_cahn_image, john_cahn_image_caption, time_cone_paper)
+        )
+        self.wait()
+
         axes = ThreeDAxes(
             x_range=[-7, 7],
             y_range=[-7, 7],
