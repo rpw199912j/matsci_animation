@@ -770,16 +770,6 @@ class ProbToPhaseFraction(ZoomedScene, SpaceScene):
         self.zoom_activated = False
         self.wait()
 
-        self.play(
-            LaggedStart(
-                *[FadeOut(grid_line) for grid_line in grid_lines_horizontal[::-1]],
-                *[FadeOut(grid_line) for grid_line in grid_lines_vertical[::-1]],
-                lag_ratio=0.2
-            ),
-            run_time=1
-        )
-        self.wait()
-
         # add a 10*10 grid of random numbers in the range of [0, 1)
         rng = np.random.default_rng(0)  # use a seeded random number generator to ensure reproducibility
         random_num_grid = rng.uniform(size=(grid_dimension_x, grid_dimension_y))
@@ -787,6 +777,19 @@ class ProbToPhaseFraction(ZoomedScene, SpaceScene):
         # if higher than the threshold, desiganate this point as transformed
         prob_untransformed = 0.2
         transformed_grid = (random_num_grid >= prob_untransformed)
+
+        # add a grid of numbers from the randomly generated random_num_grid
+        random_num_grid_visualized = [
+            DecimalNumber(number=random_num_grid[row_index][col_index],
+                          font_size=0.5*DEFAULT_FONT_SIZE,
+                          num_decimal_places=2).move_to(sampling_box_axes.c2p(row_index + 0.5, col_index + 0.5))
+            for row_index in range(grid_dimension_x) for col_index in range(grid_dimension_y)
+        ]
+        # convert into a VGroup object
+        random_num_grid_visualized = VGroup(*random_num_grid_visualized)
+        # AHA: wow, never knew you can sort a VGroup based on dot product!
+        # sort the VMobject so that it appears from bottom left to upper right
+        random_num_grid_visualized.sort(lambda num: np.dot(num, UP + RIGHT))
 
         # create a grid of white dots at those points which are transformed
         transformed_dot_lst = [Dot(point=sampling_box_axes.c2p(row_index + 0.5, col_index + 0.5),
@@ -812,6 +815,39 @@ class ProbToPhaseFraction(ZoomedScene, SpaceScene):
                       (count_perc_eqn.submobjects[0].get_center() - count_tracker_label.get_center())[1] * 0.8,
                       0])
         )
+
+        self.play(Write(random_num_grid_visualized))
+        self.wait()
+
+        self.play(
+            *[Indicate(random_num) for random_num in random_num_grid_visualized
+              if random_num.get_value() >= prob_untransformed],
+            run_time=2
+        )
+        self.wait()
+        self.play(
+            *[Indicate(random_num, color=RED) for random_num in random_num_grid_visualized
+              if random_num.get_value() < prob_untransformed],
+            run_time=2
+        )
+        self.wait()
+
+        self.play(
+            LaggedStart(
+                *[FadeOut(num) for num in random_num_grid_visualized],
+                lag_ratio=0.2
+            ),
+            run_time=1
+        )
+        self.play(
+            LaggedStart(
+                *[FadeOut(grid_line) for grid_line in grid_lines_horizontal[::-1]],
+                *[FadeOut(grid_line) for grid_line in grid_lines_vertical[::-1]],
+                lag_ratio=0.2
+            ),
+            run_time=1
+        )
+        self.wait()
 
         self.play(LaggedStart(
             *[FadeIn(dot) for dot in transformed_dot_lst],
