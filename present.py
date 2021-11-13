@@ -1274,7 +1274,7 @@ class CalcTimeConeVolume(ThreeDScene):
         circle_lst = [circle.shift(axes.c2p(point_of_interest_x, 0, num))
                       for num, circle in enumerate(circle_lst)]
 
-        sphere_lst = [Sphere(center=circle.get_center(), radius=circle.radius, fill_opacity=0.6,).set_color(RED)
+        sphere_lst = [Sphere(center=circle.get_center(), radius=circle.radius, fill_opacity=0.6).set_color(RED)
                       for circle in circle_lst]
 
         self.play(FadeIn(*circle_lst))
