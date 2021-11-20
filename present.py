@@ -863,11 +863,13 @@ class ProbToPhaseFraction(ZoomedScene, SpaceScene):
         prob_untransformed = 0.2
         transformed_grid = (random_num_grid >= prob_untransformed)
 
-        # add a grid of numbers from the randomly generated random_num_grid
+        # truncate the number grid at 3 decimal places
+        random_num_grid_truncated = np.trunc(random_num_grid * 1000) / 1000
+        # add a grid of numbers from the randomly generated random_num_grid_truncated
         random_num_grid_visualized = [
-            DecimalNumber(number=random_num_grid[row_index][col_index],
-                          font_size=0.5*DEFAULT_FONT_SIZE,
-                          num_decimal_places=2).move_to(sampling_box_axes.c2p(row_index + 0.5, col_index + 0.5))
+            DecimalNumber(number=random_num_grid_truncated[row_index][col_index],
+                          font_size=0.4 * DEFAULT_FONT_SIZE,
+                          num_decimal_places=3).move_to(sampling_box_axes.c2p(row_index + 0.5, col_index + 0.5))
             for row_index in range(grid_dimension_x) for col_index in range(grid_dimension_y)
         ]
         # convert into a VGroup object
