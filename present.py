@@ -917,13 +917,7 @@ class ProbToPhaseFraction(ZoomedScene, SpaceScene):
         )
         self.wait()
 
-        self.play(
-            LaggedStart(
-                *[FadeOut(num) for num in random_num_grid_visualized],
-                lag_ratio=0.2
-            ),
-            run_time=1
-        )
+        self.play(Unwrite(random_num_grid_visualized))
         self.play(
             LaggedStart(
                 *[FadeOut(grid_line) for grid_line in grid_lines_horizontal[::-1]],
