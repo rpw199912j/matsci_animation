@@ -690,19 +690,19 @@ class ConnectTimeConeWithPhaseFraction(Scene):
                           font_size=40)
         statement_1.shift(UP * 2)
 
-        statement_2 = Tex("$\\text{the phase fraction untransformed}=P(\\text{no nucleation has occurred})$",
+        statement_2 = Tex("$\\text{the phase fraction untransformed}=P(\\text{no phase transformation has occurred})$",
                           font_size=40)
         statement_2.next_to(statement_1, DOWN, buff=0.5)
 
-        statement_3 = Tex("$\\text{the phase fraction transformed}=1-P(\\text{no nucleation has occurred})$",
+        statement_3 = Tex("$\\text{the phase fraction transformed}=1-P(\\text{no phase transformation has occurred})$",
                           font_size=40)
 
-        statement_4 = Tex("$P(\\text{no nucleation has occurred})$",
+        statement_4 = Tex("$P(\\text{no phase transformation has occurred})$",
                           font_size=40)
         statement_4.align_to(statement_3, RIGHT)
 
         next_slide_title = Tex(
-            "$\\text{How to calculate } P(\\text{no nucleation has occurred})\\text{ from time cone?}$",
+            "$\\text{How to calculate } P(\\text{no phase transformation has occurred})\\text{ from time cone?}$",
             font_size=40)
         next_slide_title.to_corner(UL)
 
@@ -969,7 +969,7 @@ class ProbToPhaseFraction(ZoomedScene, SpaceScene):
 class ConnectProbToTimeCone(Scene):
     def construct(self):
         slide_title = Tex(
-            "$\\text{How to calculate } P(\\text{no nucleation has occurred})\\text{ from time cone?}$",
+            "$\\text{How to calculate } P(\\text{no phase transformation has occurred})\\text{ from time cone?}$",
             font_size=40)
         slide_title.to_corner(UL)
 
@@ -1452,7 +1452,7 @@ class SinglePhaseFraction(Scene):
 
         statement_2 = Tex(
             "the phase fraction transformed", "$=$",
-            "$1-$", "$P(\\text{no nucleation has occurred})$",
+            "$1-$", "$P(\\text{no phase transformation has occurred})$",
             font_size=40,
             arg_separator=" "
         )
