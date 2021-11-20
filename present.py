@@ -43,7 +43,7 @@ class PhysicalPic(Scene):
         rectangle_mask = ScreenRectangle(stroke_width=200, stroke_color=BLACK, height=6, aspect_ratio=4 * 20.5 / 9 / 6)
 
         circles = [Circle(color=YELLOW, fill_color=YELLOW, fill_opacity=1, radius=1E-6, arc_center=shift_vec)
-                   for shift_vec in [UR+0.5*RIGHT, 2*UL, -0.5*LEFT, DR+RIGHT, DL+LEFT]]
+                   for shift_vec in [UR + 0.5 * RIGHT, 2 * UL, -0.5 * LEFT, DR + RIGHT, DL + LEFT]]
 
         phase_fraction_axes = Axes(
             x_range=[0, 1000, 100],
@@ -103,14 +103,14 @@ class PhysicalPic(Scene):
 
         self.play(
             LaggedStart(
-                *[circle.animate(rate_func=linear, run_time=1).scale(1/3E6) for circle in circles[::-1]],
+                *[circle.animate(rate_func=linear, run_time=1).scale(1 / 3E6) for circle in circles[::-1]],
                 lag_ratio=0.1
             )
         )
         self.wait()
 
         self.play(
-            *[obj.animate.shift(2*UP) for obj in [*circles, rectangle, rectangle_mask]]
+            *[obj.animate.shift(2 * UP) for obj in [*circles, rectangle, rectangle_mask]]
         )
         self.wait()
 
@@ -130,7 +130,7 @@ class PhysicalPic(Scene):
         self.wait()
 
         self.play(
-            *[obj.animate.shift(2*LEFT) for obj in self.mobjects]
+            *[obj.animate.shift(2 * LEFT) for obj in self.mobjects]
         )
         self.wait()
 
@@ -262,7 +262,7 @@ class Motivation(Scene):
             "How", " to ", "make", " them", "?"
         )
         problem_statement_2.align_to(problem_statement_1, LEFT)
-        problem_statement_2.shift(problem_statement_1[1].get_center()-problem_statement_2[1].get_center())
+        problem_statement_2.shift(problem_statement_1[1].get_center() - problem_statement_2[1].get_center())
         self.play(Write(problem_statement_1))
         self.wait()
         self.play(TransformMatchingTex(problem_statement_1, problem_statement_2, transform_mismatches=True))
@@ -304,7 +304,7 @@ class Motivation(Scene):
             LEFT * 1.5, RIGHT * 1.5
         ).set_color(RED).move_to(ttt_diagram.get_center()).shift(UP * 0.09 + RIGHT * 0.05)
         ttt_diagram_line_1 = Line(
-            start=ttt_diagram.get_corner(UL)+0.62*DR,
+            start=ttt_diagram.get_corner(UL) + 0.62 * DR,
             end=ttt_diagram_line_2.get_left()
         ).set_color(RED)
 
@@ -383,7 +383,7 @@ class TimeCone1D2D(ThreeDScene):
 
         john_cahn_image = ImageMobject("./figure/john_cahn_image.jpg")
         john_cahn_image.scale(1.5)
-        john_cahn_image.to_edge(LEFT, buff=3*DEFAULT_MOBJECT_TO_EDGE_BUFFER)
+        john_cahn_image.to_edge(LEFT, buff=3 * DEFAULT_MOBJECT_TO_EDGE_BUFFER)
 
         john_cahn_image_caption = Tex(
             r"John W. Cahn\\(1928-2016)"
@@ -392,7 +392,7 @@ class TimeCone1D2D(ThreeDScene):
 
         time_cone_paper = ImageMobject("./figure/time_cone_paper.png")
         time_cone_paper.scale(0.6)
-        time_cone_paper.to_edge(RIGHT, buff=2*DEFAULT_MOBJECT_TO_EDGE_BUFFER)
+        time_cone_paper.to_edge(RIGHT, buff=2 * DEFAULT_MOBJECT_TO_EDGE_BUFFER)
 
         self.play(FadeIn(john_cahn_image))
         self.play(Write(john_cahn_image_caption))
@@ -840,7 +840,7 @@ class ProbToPhaseFraction(ZoomedScene, SpaceScene):
         # reverse zooming
         self.play(
             self.get_zoomed_display_pop_out_animation(),
-            rate_func=lambda t: smooth(1-t)
+            rate_func=lambda t: smooth(1 - t)
         )
         self.wait()
 
