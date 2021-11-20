@@ -1,6 +1,7 @@
 import numpy as np
 from manim import *
 from rigid_mechanics_manim_physics import *
+from manim.utils.rate_functions import unit_interval
 
 DOT_TO_LINE = 200
 
@@ -155,6 +156,90 @@ class PhysicalPic(Scene):
             )
         )
         self.wait()
+
+
+class MotivationCompounds(SpaceScene):
+    def construct(self):
+        slide_title = Tex(
+            "Motivation", font_size=40
+        )
+        slide_title.to_corner(UL)
+
+        page_2 = Tex("$2$", font_size=40)
+        page_2.to_edge(DR)
+
+        self.add(slide_title, page_2)
+        self.wait()
+
+        funnel = VGroup(Line(start=4 * LEFT, end=LEFT + 2.5 * DOWN),
+                        Line(start=4 * RIGHT, end=RIGHT + 2.5 * DOWN))
+
+        compounds = VGroup(
+            Tex("BaMn$_2$O$_8$").shift(LEFT * 2 + UP * 2),
+            Tex("CaFe$_3$S$_2$").shift(LEFT * 2 + UP),
+            Tex("LaCr$_2$O$_7$").shift(LEFT * 2),
+            Tex("SrFe$_3$O$_8$").shift(RIGHT * 2),
+            Tex("MgNi$_3$O$_7$").shift(RIGHT * 2 + UP),
+            Tex("CoNb$_4$O$_{11}$").shift(RIGHT * 2 + UP * 2)
+        )
+
+        self.play(Write(compounds))
+        self.wait()
+        self.play(FadeIn(funnel))
+        self.wait()
+
+        self.make_static_body(funnel)
+        self.make_rigid_body(compounds)
+        self.wait(5)
+
+        self.remove(compounds)
+        self.play(
+            FadeOut(funnel)
+        )
+
+
+@unit_interval
+def ease_out_elastic_no_bounce(t: float) -> float:
+    c4 = (2 * np.pi) / 3
+    if t == 0:
+        return 0
+    elif t >= 0.225:
+        return 1
+    else:
+        return pow(2, -10 * t) * np.sin((t * 10 - 0.75) * c4) + 1
+
+
+class MotivationSynthesis(SpaceScene):
+    def construct(self):
+        slide_title = Tex(
+            "Motivation", font_size=40
+        )
+        slide_title.to_corner(UL)
+
+        page_2 = Tex("$2$", font_size=40)
+        page_2.to_edge(DR)
+
+        self.add(slide_title, page_2)
+        self.wait()
+
+        synthesis_actions = [None, "Heat", "Grind", "Solution", "Pressure"]
+
+        synthesis_actions = [Tex(action).shift(DOWN) if action else VMobject() for action in synthesis_actions]
+
+        for _ in range(len(synthesis_actions) - 1):
+            self.play(
+                FadeOut(synthesis_actions[_], shift=UP, rate_func=ease_out_elastic_no_bounce, run_time=1),
+                synthesis_actions[_ + 1].animate(rate_func=rate_functions.ease_out_elastic, run_time=1).shift(UP)
+            )
+            self.wait()
+
+        slant_line = VGroup(Line(start=2 * LEFT + 2.5 * DOWN, end=DOWN, stroke_opacity=0),
+                            Line(start=2 * RIGHT + 2.5 * DOWN, end=DOWN, stroke_opacity=0))
+        self.add(slant_line)
+
+        self.make_static_body(slant_line)
+        self.make_rigid_body(synthesis_actions[-1])
+        self.wait(4)
 
 
 class Motivation(Scene):
