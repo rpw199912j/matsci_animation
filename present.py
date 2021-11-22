@@ -804,23 +804,23 @@ class ConnectTimeConeWithPhaseFraction(Scene):
         page_5.to_edge(DR)
 
         statement_1 = Tex("$\\text{the phase fraction transformed}=1-\\text{the phase fraction untransformed}$",
-                          font_size=40)
+                          font_size=35)
         statement_1.shift(UP * 2)
 
         statement_2 = Tex("$\\text{the phase fraction untransformed}=P(\\text{no phase transformation has occurred})$",
-                          font_size=40)
+                          font_size=35)
         statement_2.next_to(statement_1, DOWN, buff=0.5)
 
         statement_3 = Tex("$\\text{the phase fraction transformed}=1-P(\\text{no phase transformation has occurred})$",
-                          font_size=40)
+                          font_size=35)
 
         statement_4 = Tex("$P(\\text{no phase transformation has occurred})$",
-                          font_size=40)
+                          font_size=35)
         statement_4.align_to(statement_3, RIGHT)
 
         next_slide_title = Tex(
             "$\\text{How to calculate } P(\\text{no phase transformation has occurred})\\text{ from time cone?}$",
-            font_size=40)
+            font_size=35)
         next_slide_title.to_corner(UL)
 
         self.add(slide_title, page_5)
@@ -1083,7 +1083,7 @@ class ConnectProbToTimeCone(Scene):
     def construct(self):
         slide_title = Tex(
             "$\\text{How to calculate } P(\\text{no phase transformation has occurred})\\text{ from time cone?}$",
-            font_size=40)
+            font_size=35)
         slide_title.to_corner(UL)
 
         page_6 = Tex("$6$", font_size=40)
@@ -1558,7 +1558,7 @@ class SinglePhaseFraction(Scene):
         statement_1 = Tex(
             "the phase fraction transformed", "$=$",
             "$1-$", "the phase fraction untransformed",
-            font_size=40,
+            font_size=37,
             arg_separator=" "
         )
         statement_1.shift(UP * 2)
@@ -1566,7 +1566,7 @@ class SinglePhaseFraction(Scene):
         statement_2 = Tex(
             "the phase fraction transformed", "$=$",
             "$1-$", "$P(\\text{no phase transformation has occurred})$",
-            font_size=40,
+            font_size=37,
             arg_separator=" "
         )
         statement_2.move_to(statement_1.get_center())
@@ -1574,7 +1574,7 @@ class SinglePhaseFraction(Scene):
         statement_3 = Tex(
             "the phase fraction transformed", "$=$",
             "$1-$", "$e^{-J||\\Omega_N||}$",
-            font_size=40,
+            font_size=37,
             arg_separator=" "
         )
         statement_3.move_to(statement_2.get_center()).align_to(statement_2, LEFT)
