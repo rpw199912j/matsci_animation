@@ -14,7 +14,7 @@ by plotting the (volume) phase fraction transformed as a function of time at dif
 ![](./media/videos/present/720p30/PhaseFractionToTTT_ManimCE_v0.12.0.gif)
 [[Source code here]](https://github.com/rpw199912j/matsci_animation/blob/master/present.py#L1709)
 
-### Convert probability at a single point to overall phase fraction
+### Convert a probability to an overall phase fraction
 ![](./media/videos/present/720p30/ProbToPhaseFraction_ManimCE_v0.12.0.gif)
 [[Source code here]](https://github.com/rpw199912j/matsci_animation/blob/master/present.py#L859)
 
@@ -36,4 +36,9 @@ if the number is less than 0.2, then a phase transformation has not occurred.
 After all of this, the number of white circles should be close to 80. 
 However, since we only have a 10 by 10 grid, and also due to the probabilistic nature of the simulation, 
 the number of white circles won't always be exactly 80. 
-We could, in theory, increase the size of the sampling grid and let it approach a number on the order of 10^23, which would mimic a real-life material and also give us a fraction very close to 0.8. The last part of the animation is just fun to visualize. What I am trying to show is that instead of counting the number of white circles and divide it by 100 to get the overall phase fraction transformed, we can treat all the circles as rigid bodies and simulate the effect of gravity so that all the circles should fill up to about the 80% horizontal line. 
+We could, in theory, increase the size of the sampling grid and let it approach a number on the order of 10<sup>23</sup>, 
+which would mimic a real-life material and also give us a fraction very close to 0.8. 
+The last part of the animation is just fun to visualize. 
+What I am trying to show is that instead of counting the number of white circles and divide it by 100 to get 
+the overall phase fraction transformed, we can treat all the circles as rigid bodies and simulate the effect of gravity 
+so that all the circles should fill up to about the 80% horizontal line. 
