@@ -678,6 +678,123 @@ class TimeConeIntuition(Scene):
         self.wait()
 
 
+# noinspection DuplicatedCode
+class TimeConeIntuitionEmphasis(Scene):
+    def construct(self):
+        slide_title = Tex(
+            "How do we use the time cone?", font_size=40
+        )
+        slide_title.to_corner(UL).shift(UP * 0.3)
+
+        page_4 = Tex("$4$", font_size=40)
+        page_4.to_edge(DR)
+
+        self.add(slide_title, page_4)
+
+        axes = Axes(
+            x_range=[0, 7],
+            y_range=[0, 7],
+            x_length=8,
+            y_length=6
+        )
+
+        x_label = axes.get_x_axis_label(Tex("$x$"))
+        y_label = axes.get_y_axis_label(Tex("$t$"))
+
+        growth_cone_base_radius = 1.5
+        growth_cone_height = 6
+
+        point_of_interest = Dot()
+        point_of_interest_x, point_of_interest_y = 3.5, 3.5
+        point_of_interest.move_to(axes.c2p(point_of_interest_x, point_of_interest_y))
+
+        self.add(axes, x_label, y_label, point_of_interest)
+
+        nucleation_region_top = point_of_interest.get_center()
+        nucleation_region_left = axes.c2p(point_of_interest_x -
+                                          (point_of_interest_y / (growth_cone_height / growth_cone_base_radius)), 0)
+        nucleation_region_right = axes.c2p(point_of_interest_x +
+                                           (point_of_interest_y / (growth_cone_height / growth_cone_base_radius)), 0)
+        nucleation_region_line_1 = DashedLine(start=nucleation_region_top,
+                                              end=nucleation_region_left)
+        nucleation_region_line_2 = DashedLine(start=nucleation_region_left,
+                                              end=nucleation_region_right)
+        nucleation_region_line_3 = DashedLine(start=nucleation_region_right,
+                                              end=nucleation_region_top)
+        nucleation_region = VGroup(nucleation_region_line_1, nucleation_region_line_2, nucleation_region_line_3)
+        nucleation_region.set_stroke(color=BLUE)
+
+        growth_cone, growth_cone_shade = create_single_growth_cone_with_shade(axes,
+                                                                              3.5,
+                                                                              0, 1.5, 6)
+
+        path_correction_vector = growth_cone.get_center() - growth_cone.get_bottom()
+
+        growth_cone.move_to(nucleation_region_right + path_correction_vector)
+
+        self.add(nucleation_region, growth_cone, growth_cone_shade)
+        self.wait()
+
+        self.play(
+            growth_cone.animate.move_to(nucleation_region_top + path_correction_vector)
+        )
+        self.wait()
+
+        nucleation_region_bottom_middle = (nucleation_region_left + nucleation_region_right) / 2
+        as_nucleation_origin = DashedLine(start=nucleation_region_top, end=nucleation_region_bottom_middle)
+
+        self.play(
+            Create(as_nucleation_origin)
+        )
+        self.wait()
+        self.play(
+            growth_cone.animate.move_to(nucleation_region_bottom_middle + path_correction_vector)
+        )
+        self.wait()
+
+        self.play(
+            growth_cone.animate.move_to(nucleation_region_left + path_correction_vector)
+        )
+        self.wait()
+        self.play(
+            growth_cone.animate.move_to((nucleation_region_bottom_middle + nucleation_region_left) / 2
+                                        + path_correction_vector)
+        )
+        self.wait()
+
+        takeaway_message_1 = Tex(
+            "&\\text{For this point to be ", "transformed}", r",\\",
+            "&\\text{there should be",  " at least 1 }", r"\\&\text{nucleation event or time cone}\\",
+            "&\\text{present in the blue triangle region.}",
+            font_size=0.7*DEFAULT_FONT_SIZE,
+            tex_environment="align*"
+        )
+        takeaway_message_1.to_corner(UR, buff=DEFAULT_MOBJECT_TO_EDGE_BUFFER)
+        self.play(
+            Write(takeaway_message_1)
+        )
+        self.wait()
+
+        takeaway_message_2 = Tex(
+            "&\\text{For this point to be ", "un", "transformed}", r",\\",
+            "&\\text{there should be", " no }", r"\\&\text{nucleation event or time cone}\\",
+            "&\\text{present in the blue triangle region.}",
+            font_size=0.7 * DEFAULT_FONT_SIZE,
+            tex_environment="align*"
+        )
+        takeaway_message_2.to_corner(UR, buff=DEFAULT_MOBJECT_TO_EDGE_BUFFER)
+        self.play(
+            TransformMatchingTex(takeaway_message_1, takeaway_message_2),
+            FadeOut(growth_cone, growth_cone_shade)
+        )
+        self.wait()
+
+        self.play(
+            Circumscribe(takeaway_message_2, time_width=2)
+        )
+        self.wait()
+
+
 class ConnectTimeConeWithPhaseFraction(Scene):
     def construct(self):
         slide_title = Text("Let's connect time cone to phase fraction transformed", font_size=30)
