@@ -1,6 +1,6 @@
 import numpy as np
 from manim import *
-from rigid_mechanics_manim_physics import *
+from manim_physics import *
 from manim.utils.rate_functions import unit_interval
 
 DOT_TO_LINE = 200
