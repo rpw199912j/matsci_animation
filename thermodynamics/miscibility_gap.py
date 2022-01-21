@@ -26,6 +26,100 @@ def get_y_coord_on_gibbs(x: float, omega: float, temperature: float, gas_constan
                                                                (1 - x) * np.log(1 - x))
 
 
+class GibbsFreeEnergy(Scene):
+    def construct(self):
+        # define the plotting axes
+        axes = Axes(
+            x_range=[0, 1, 0.1],
+            y_range=[-1200, 1400, 200],
+            x_length=6,
+            y_length=8,
+            tips=False
+        )
+
+        temperature_y_label = axes.get_y_axis_label(
+            Tex("$G$"), edge=LEFT, direction=LEFT, buff=0.4
+        )
+        composition_label = axes.get_x_axis_label(Tex("$X$"))
+
+        # define some variables
+        gas_constant = 8.31
+        temperature = 190
+        omega = 5200
+
+        # define enthalpy of mixing
+        h_mix = axes.plot(
+            lambda x: omega * x * (1 - x),
+            x_range=[1E-6, 1 - 1E-6]
+        )
+
+        # define -T * entropy of mixing
+        combined_s_mixed = axes.plot(
+            lambda x: gas_constant * temperature * (x * np.log(x) + (1 - x) * np.log(1 - x)),
+            x_range=[1E-6, 1 - 1E-6]
+        )
+
+        num_of_lines = 40
+        hlines_combined_s_mixed = axes.get_vertical_lines_to_graph(
+            combined_s_mixed, x_range=[1E-6, 1 - 1E-6], num_lines=num_of_lines, color=BLUE
+        )
+
+        # define gibbs free energy
+        gibbs_free_energy = axes.plot(
+            lambda x: omega * x * (1 - x) + gas_constant * temperature * (x * np.log(x) + (1 - x) * np.log(1 - x)),
+            x_range=[1E-6, 1 - 1E-6]
+        )
+
+        self.add(axes)
+        self.play(
+            LaggedStart(
+                *[Write(label) for label in [temperature_y_label, composition_label]],
+                lag_ratio=1
+            )
+        )
+        self.wait()
+
+        self.play(
+            Create(h_mix)
+        )
+        self.play(
+            Create(combined_s_mixed)
+        )
+        self.wait()
+
+        self.play(
+            Create(hlines_combined_s_mixed, run_time=2)
+        )
+        self.wait()
+
+
+
+        shift_up_vectors = [
+            axes.c2p(
+                x_coord, omega * x_coord * (1 - x_coord)
+            ) - axes.c2p(
+                x_coord, 0
+            ) for x_coord in np.linspace(1E-6, 1 - 1E-6, num_of_lines)
+        ]
+
+        self.play(
+            LaggedStart(
+                *[hline.animate.shift(shift_up_vector)
+                  for hline, shift_up_vector in zip(hlines_combined_s_mixed, shift_up_vectors)],
+                lag_ratio=0.3
+            ),
+            run_time=3
+        )
+        self.wait()
+
+        self.play(
+            TransformFromCopy(
+                h_mix, gibbs_free_energy
+            )
+        )
+        self.wait()
+
+
 class MiscibilityGap(Scene):
     def construct(self):
         # define the plotting axis for Gibbs free energy vs. composition
