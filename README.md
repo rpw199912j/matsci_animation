@@ -2,6 +2,25 @@
 A home for interesting and intuitive animations related to materials science.
 
 ## Example Gallery
+### Miscibility gap from the common tangent construction
+This animation shows how we can get a miscibility gap by constructing a common
+tangent line and tracking the corresponding compositions as the temperature increases.
+![](./media/videos/miscibility_gap/720p30/MiscibilityGap_ManimCE_v0.14.0.gif)
+[[Source code here]](https://github.com/rpw199912j/matsci_animation/blob/master/thermodynamics/miscibility_gap.py#L123)
+
+
+### Fourier Series as a solution to the heat equation
+This animation explains how we can approximate a square wave by incrementally
+adding up sine curves.
+![](./media/videos/heat_equation/720p30/FourierSeries_ManimCE_v0.14.0.gif)
+[[Source code here]](https://github.com/rpw199912j/matsci_animation/blob/master/kinetics/heat_equation.py#L5)
+
+### Three-fold rotational symmetry of a cube
+This animation shows the three-fold rotational symmetry of a cube.
+![](./media/videos/cube_symmetry/720p30/CubeSymmetry_ManimCE_v0.14.0.gif)
+[[Source code here]](https://github.com/rpw199912j/matsci_animation/blob/master/crystallography/cube_symmetry.py#L4)
+
+
 ### Calculate the time cone volume in 1D, 2D, 3D space-time
 An animation that visually explains the calculation steps 
 for the time cone volume in 1D, 2D, 3D space-time.
