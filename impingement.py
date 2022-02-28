@@ -131,23 +131,27 @@ class TestHorizontalSlice(ThreeDScene):
             lambda:
             Square(side_length=10 * unit_y_length).shift(
                 t_tracker.get_value() * unit_z_vector
-            ).set_opacity(0.3).set_stroke(opacity=0)
+            ).set_opacity(0.1).set_stroke(opacity=0)
         )
         circ_1 = always_redraw(
             lambda:
-            Circle(radius=2 * unit_y_length - t_tracker.get_value(), color=BLUE).shift(
+            Circle(radius=2 * unit_y_length - t_tracker.get_value() * alpha_rate_inverse * unit_z_length,
+                   color=ORANGE, stroke_width=2).shift(
                 t_tracker.get_value() * unit_z_vector
             )
         )
         circ_2 = always_redraw(
             lambda:
-            Circle(radius=(t_tracker.get_value() - 0.5) * 0.5, color=GREEN).shift(
-                0.5 * unit_y_vector + t_tracker.get_value() * unit_z_vector
-            ) if t_tracker.get_value() > 0.5 else Circle(radius=0)
+            Circle(radius=(t_tracker.get_value() - beta_cone_time) * beta_rate_inverse * unit_z_length,
+                   color=GREEN, stroke_width=2).shift(
+                beta_cone_pos * unit_y_vector + t_tracker.get_value() * unit_z_vector
+            ) if t_tracker.get_value() > beta_cone_time else Circle(radius=0).shift(
+                beta_cone_pos * unit_y_vector + t_tracker.get_value() * unit_z_vector
+            )
         )
         circ_intersection = always_redraw(
             lambda:
-            Intersection(circ_1, circ_2, color=YELLOW, fill_color=PURPLE, fill_opacity=1).shift(
+            Intersection(circ_1, circ_2, color=YELLOW, fill_color=BLUE, fill_opacity=1, stroke_width=2).shift(
                 t_tracker.get_value() * unit_z_vector
             )
         )
