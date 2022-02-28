@@ -150,7 +150,6 @@ class TestHorizontalSlice(ThreeDScene):
             Intersection(circ_1, circ_2, color=YELLOW, fill_color=PURPLE, fill_opacity=1).shift(
                 t_tracker.get_value() * unit_z_vector
             )
-            # if t_tracker.get_value() >= 0.5 else VMobject()
         )
 
         self.add(circ_1, circ_2, circ_intersection, plane)
