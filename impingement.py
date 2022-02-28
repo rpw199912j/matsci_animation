@@ -75,9 +75,15 @@ class TwoCircleImpingement(Scene):
 class TestHorizontalSlice(ThreeDScene):
     def construct(self):
         axes = ThreeDAxes(
+            x_range=[-5, 5],
+            y_range=[-5, 5],
+            z_range=[-5, 5],
+            x_length=8,
+            y_length=8,
+            z_length=8
         )
         # make the axes completely transparent
-        axes.set_opacity(opacity=0)
+        axes.set_opacity(opacity=0.3)
 
         self.set_camera_orientation(70 * DEGREES, -20 * DEGREES)
         self.add(axes)
