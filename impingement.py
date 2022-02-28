@@ -158,7 +158,24 @@ class TestHorizontalSlice(ThreeDScene):
 
         self.add(circ_1, circ_2, circ_intersection, plane)
         self.play(
-            t_tracker.animate.set_value(3),
+            t_tracker.animate.set_value(beta_cone_time),
+            rate_func=linear,
+            run_time=2
+        )
+        self.wait()
+
+        t_circ_transition = beta_cone_time + (alpha_cone_radius -
+                                              beta_cone_time * alpha_rate_inverse -
+                                              beta_cone_pos) / (alpha_rate_inverse + beta_rate_inverse)
+        self.play(
+            t_tracker.animate.set_value(t_circ_transition),
+            rate_func=linear,
+            run_time=2
+        )
+        self.wait()
+
+        self.play(
+            t_tracker.animate.set_value(alpha_cone_height),
             rate_func=linear,
             run_time=3
         )
