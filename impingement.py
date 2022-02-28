@@ -89,8 +89,42 @@ class TestHorizontalSlice(ThreeDScene):
         self.add(axes)
 
         unit_y_length = axes.c2p(0, 1, 0)[1] - axes.c2p(0, 0, 0)[1]
+        unit_z_length = axes.c2p(0, 0, 1)[2] - axes.c2p(0, 0, 0)[2]
         unit_y_vector = axes.c2p(0, 1, 0) - axes.c2p(0, 0, 0)
         unit_z_vector = axes.c2p(0, 0, 1) - axes.c2p(0, 0, 0)
+
+        # add the time cone for the alpha phase (colored orange) and the beta phase (colored green)
+        alpha_cone_radius = 2
+        alpha_cone_height = 4
+        alpha_rate_inverse = alpha_cone_radius / alpha_cone_height
+        alpha_cone = Cone(
+            base_radius=alpha_cone_radius * unit_y_length,
+            height=alpha_cone_height * unit_z_length,
+            stroke_color=ORANGE,
+            fill_color=ORANGE,
+            fill_opacity=0.3,
+            stroke_opacity=0,
+            resolution=50
+        ).shift(alpha_cone_height * unit_z_vector)
+
+        beta_cone_pos = 0.75
+        beta_cone_time = 1
+        beta_cone_radius = 0.75
+        beta_cone_height = 3
+        beta_rate_inverse = beta_cone_radius / beta_cone_height
+        beta_cone = Cone(
+            base_radius=beta_cone_radius * unit_y_length,
+            height=beta_cone_height * unit_z_length,
+            stroke_color=GREEN_E,
+            fill_color=GREEN_E,
+            fill_opacity=0.2,
+            stroke_opacity=0,
+            show_base=True,
+            direction=-Z_AXIS,
+            resolution=50
+        ).shift(beta_cone_pos * unit_y_vector + beta_cone_time * unit_z_vector)
+
+        self.add(alpha_cone, beta_cone)
 
         t_tracker = ValueTracker(0)
         plane = always_redraw(
