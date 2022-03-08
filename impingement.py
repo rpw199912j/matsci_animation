@@ -4,12 +4,17 @@ from manim import *
 # noinspection DuplicatedCode
 def get_circ_intersec(x1, y1, x2, y2, r1, r2):
     distance = np.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
+    # when there is no intersection between the 2 circles
+    if distance > (r1 + r2) or max(r1, r2) > (min(r1, r2) + distance):
+        return VGroup(VMobject(), VMobject())
+
     delta = 0.25 * np.sqrt((distance + r1 + r2) * (distance + r1 - r2) * (distance - r1 + r2) * (-distance + r1 + r2))
     pm, mp = np.array([1, -1]), np.array([-1, 1])
     intersec_1_x, intersec_2_x = (x1 + x2) / 2 + (x2 - x1) * (r1 ** 2 - r2 ** 2) / (2 * distance ** 2) + 2 * pm * (
             y1 - y2) * delta / distance ** 2
     intersec_1_y, intersec_2_y = (y1 + y2) / 2 + (y2 - y1) * (r1 ** 2 - r2 ** 2) / (2 * distance ** 2) + 2 * mp * (
             x1 - x2) * delta / distance ** 2
+
     return VGroup(Dot(point=np.array([intersec_1_x, intersec_1_y, 0])),
                   Dot(point=np.array([intersec_2_x, intersec_2_y, 0])))
 
