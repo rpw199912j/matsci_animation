@@ -23,8 +23,8 @@ class TwoCircleImpingement(Scene):
     def construct(self):
         time_tracker = ValueTracker(0)
 
-        circ_1_x, circ_1_y, circ_1_z = -1.5, 0, 0
-        circ_1_start_radius = 1.5
+        circ_1_x, circ_1_y, circ_1_z = -0.5, 0, 0
+        circ_1_start_radius = 0.5
         circ_1_growth_rate = 0.5
         circ_1_radius_tracker = ValueTracker(circ_1_start_radius).add_updater(
             lambda tracker: tracker.set_value(
@@ -37,9 +37,9 @@ class TwoCircleImpingement(Scene):
                            arc_center=np.array([circ_1_x, circ_1_y, circ_1_z]))
         )
 
-        circ_2_x, circ_2_y, circ_2_z = 1.5, 0, 0
-        circ_2_start_radius = 1.5
-        circ_2_growth_rate = 1
+        circ_2_x, circ_2_y, circ_2_z = 0.5, 0, 0
+        circ_2_start_radius = 0.5
+        circ_2_growth_rate = 0.7
         circ_2_radius_tracker = ValueTracker(circ_2_start_radius).add_updater(
             lambda tracker: tracker.set_value(
                 circ_2_start_radius + circ_2_growth_rate * time_tracker.get_value()
@@ -73,7 +73,7 @@ class TwoCircleImpingement(Scene):
 
         # self.play(circ_1_radius_tracker.animate(run_time=2, rate_func=linear).set_value(4),
         #           circ_2_radius_tracker.animate(run_time=2, rate_func=linear).set_value(3))
-        self.play(time_tracker.animate(run_time=2, rate_func=linear).set_value(2))
+        self.play(time_tracker.animate(run_time=10, rate_func=linear).set_value(2))
         self.wait()
 
 
