@@ -77,7 +77,7 @@ class TwoCircleImpingement(Scene):
         self.wait()
 
 
-class TestHorizontalSlice(ThreeDScene):
+class AlphaWins2D(ThreeDScene):
     def construct(self):
         axes = ThreeDAxes(
             x_range=[-5, 5],
@@ -167,21 +167,26 @@ class TestHorizontalSlice(ThreeDScene):
             rate_func=linear,
             run_time=2
         )
+        # self.stop_ambient_camera_rotation()
         self.wait()
 
         t_circ_transition = beta_cone_time + (alpha_cone_radius -
                                               beta_cone_time * alpha_rate_inverse -
                                               beta_cone_pos) / (alpha_rate_inverse + beta_rate_inverse)
+        # self.begin_ambient_camera_rotation(rate=10*DEGREES)
         self.play(
             t_tracker.animate.set_value(t_circ_transition),
             rate_func=linear,
             run_time=2
         )
+        # self.stop_ambient_camera_rotation()
         self.wait()
 
+        # self.begin_ambient_camera_rotation(rate=10*DEGREES)
         self.play(
             t_tracker.animate.set_value(alpha_cone_height),
             rate_func=linear,
             run_time=3
         )
+        # self.stop_ambient_camera_rotation()
         self.wait()
