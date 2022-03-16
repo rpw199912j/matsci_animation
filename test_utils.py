@@ -24,15 +24,23 @@ class TestNewAxes(Scene):
 
 
 class TestParametricSurface(ThreeDScene):
+
+    @staticmethod
+    def get_z_value(x, y):
+        return x + y
+
     def construct(self):
         # define the axes
+        x_max, z_max = 4, 8
+        y_max = x_max
+
         axes_3d = ThreeDAxes(
-            x_range=[0, 3, 1],
-            y_range=[0, 3, 1],
-            z_range=[0, 6, 1],
-            x_length=4,
-            y_length=4,
-            z_length=4,
+            x_range=[0, x_max, 1],
+            y_range=[0, y_max, 1],
+            z_range=[0, z_max, 1],
+            x_length=5,
+            y_length=5,
+            z_length=5,
             tips=False
         )
         x_axis = axes_3d.get_x_axis()
@@ -51,11 +59,12 @@ class TestParametricSurface(ThreeDScene):
         self.wait()
 
         # create the dots
-        sampling_unit_increment = 3 / 10
+        sampling_number = 10
+        sampling_unit_increment = x_max / sampling_number
         dots_on_2d_plane = [Dot(point=axes_3d.c2p((row_index + 0.5) * sampling_unit_increment,
                                                   (col_index + 0.5) * sampling_unit_increment, 0),
                                 radius=(axes_3d.c2p(0.1 * sampling_unit_increment, 0, 0) - axes_3d.c2p(0, 0, 0))[0])
-                            for row_index in range(10) for col_index in range(10)
+                            for row_index in range(sampling_number) for col_index in range(sampling_number)
                             ]
         dots_on_2d_plane = VGroup(*dots_on_2d_plane)
         self.play(
@@ -63,22 +72,17 @@ class TestParametricSurface(ThreeDScene):
         )
 
         # re-orient the camera to move from quasi-2d to 3d
-        axes_3d_shift_vector = -5 * Y_AXIS - Z_AXIS
         self.move_camera(
             phi=80 * DEGREES, theta=-90 * DEGREES,
-            added_anims=[
-                VGroup(
-                    x_axis, y_axis, x_label, y_label, dots_on_2d_plane
-                ).animate.shift(axes_3d_shift_vector)
-            ]
+            frame_center=axes_3d.get_center()
         )
 
         # add the third axis and its label
         self.play(
             LaggedStart(
                 *[
-                    Create(z_axis.shift(axes_3d_shift_vector)),
-                    Write(z_label.shift(axes_3d_shift_vector))
+                    Create(z_axis),
+                    Write(z_label)
                 ],
                 lag_ratio=1.2
             )
@@ -89,13 +93,14 @@ class TestParametricSurface(ThreeDScene):
             axes_3d.c2p(
                 (row_index + 0.5) * sampling_unit_increment,
                 (col_index + 0.5) * sampling_unit_increment,
-                (row_index + 0.5) * sampling_unit_increment + (col_index + 0.5) * sampling_unit_increment
+                self.get_z_value((row_index + 0.5) * sampling_unit_increment,
+                                 (col_index + 0.5) * sampling_unit_increment)
             ) - axes_3d.c2p(
                 (row_index + 0.5) * sampling_unit_increment,
                 (col_index + 0.5) * sampling_unit_increment,
                 0
             )
-            for row_index in range(10) for col_index in range(10)
+            for row_index in range(sampling_number) for col_index in range(sampling_number)
         ]
         self.play(
             LaggedStart(
@@ -110,25 +115,39 @@ class TestParametricSurface(ThreeDScene):
         # add the surface
         surface = Surface(
             lambda u, v: axes_3d.c2p(
-                u, v, u + v
+                u, v, self.get_z_value(u, v)
             ),
-            resolution=(10, 10),
-            u_range=[0, 3],
-            v_range=[0, 3]
+            resolution=(sampling_number, sampling_number),
+            u_range=[0, x_max],
+            v_range=[0, x_max],
+            stroke_opacity=0
         )
-        surface.set_style(fill_opacity=1, stroke_opacity=0)
         surface.set_fill_by_value(
-            axes=axes_3d, colors=[(GREEN_E, 2), (RED, 5)], axis=2
+            axes=axes_3d, colors=[PURE_GREEN, "#f06b0c"], axis=2
         )
+        surface.set_style(fill_opacity=1)
+
         self.play(
-            Create(surface)
+            Create(surface),
+            FadeOut(dots_on_2d_plane)
         )
         self.wait()
 
-        self.begin_ambient_camera_rotation(
+        # delete
+        test_plot = axes_3d.plot(
+            lambda u: 1,
+            x_range=[0, x_max]
+        )
+        self.play(
+            Create(test_plot)
+        )
+        self.wait()
 
+        # rotate the camera
+        # self.renderer.camera._frame_center.move_to(z_axis)
+        self.begin_ambient_camera_rotation(
+            rate=0.2
         )
         self.wait(5)
         self.stop_ambient_camera_rotation()
         self.wait()
-
