@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 from itertools import product
 from manim import *
@@ -290,3 +291,853 @@ class TestParametricSurface(ThreeDScene):
         # self.wait(5)
         # self.stop_ambient_camera_rotation()
         # self.wait()
+
+
+class FocusOn3D(Transform):
+    """Shrink a spotlight to a position.
+
+    Parameters
+    ----------
+    focus_point
+        The point at which to shrink the spotlight. If it is a :class:`.~Mobject` its center will be used.
+    opacity
+        The opacity of the spotlight.
+    color
+        The color of the spotlight.
+    run_time
+        The duration of the animation.
+    kwargs : Any
+        Additional arguments to be passed to the :class:`~.Succession` constructor
+
+    Examples
+    --------
+    .. manim:: UsingFocusOn
+
+        class UsingFocusOn(Scene):
+            def construct(self):
+                dot = Dot(color=YELLOW).shift(DOWN)
+                self.add(Tex("Focusing on the dot below:"), dot)
+                self.play(FocusOn(dot))
+                self.wait()
+    """
+
+    def __init__(
+            self,
+            focus_point,
+            opacity: float = 0.2,
+            color: str = GREY,
+            run_time: float = 2,
+            **kwargs
+    ) -> None:
+        self.focus_point = focus_point
+        self.color = color
+        self.opacity = opacity
+        remover = True
+        starting_dot = Dot(
+            radius=config["frame_x_radius"] + config["frame_y_radius"],
+            stroke_width=0,
+            fill_color=self.color,
+            fill_opacity=0,
+        ).rotate(PI / 2, axis=X_AXIS)
+        super().__init__(starting_dot, run_time=run_time, remover=remover, **kwargs)
+
+    def create_target(self) -> Dot:
+        little_dot = Dot(radius=0).rotate(PI / 2, axis=X_AXIS)
+        little_dot.set_fill(self.color, opacity=self.opacity)
+        little_dot.add_updater(lambda d: d.move_to(self.focus_point))
+        return little_dot
+
+
+# slide on re-framing the time zone calculation as a competition to the time axis
+class TestCompetitivePhaseTransformation(ThreeDScene):
+    def construct(self):
+        x_max = 3
+        y_max = 3
+        z_max = 4.5
+        axes = ThreeDAxes(
+            x_range=[-x_max, x_max, 0.5],
+            y_range=[-y_max, y_max, 0.5],
+            z_range=[0, z_max, 0.5],
+            x_length=10,
+            y_length=10,
+            z_length=6.75
+        ).shift(-3 * Z_AXIS)
+
+        # get the individual axis
+        x_axis = axes.get_x_axis()
+        y_axis = axes.get_y_axis()
+        z_axis = axes.get_z_axis()
+
+        axes.x_axis = x_axis.rotate(PI / 2, axis=X_AXIS)
+        unit_z_length = axes.c2p(0, 0, 1)[2] - axes.c2p(0, 0, 0)[2]
+
+        # add the axes labels
+        x_label = axes.get_x_axis_label(Tex("$x$")).rotate(PI / 2, axis=X_AXIS)
+        y_label = axes.get_y_axis_label(Tex("$y$")).rotate(PI / 2, axis=X_AXIS)
+        z_label = axes.get_z_axis_label(Tex("$t$"))
+
+        # create the quasi-2d view (1D SpaceTime)
+        self.set_camera_orientation(
+            100 * DEGREES, -90 * DEGREES,
+        )
+        self.play(
+            LaggedStart(
+                *[
+                    Create(z_axis),
+                    Write(z_label),
+                    Create(x_axis),
+                    Write(x_label)
+                ],
+                lag_ratio=1.1
+            ),
+            run_time=3
+        )
+        self.wait()
+
+        # add the point of interest
+        t_n = 4
+        point_of_interest = Dot3D(
+            point=axes.c2p(
+                0, 0, t_n
+            )
+        )
+        point_of_interest_label = Tex("$t_N$").move_to(axes.c2p(0.25, 0, t_n)).rotate(PI / 2, axis=X_AXIS)
+        self.play(
+            FadeIn(point_of_interest),
+            FocusOn3D(point_of_interest, run_time=1.6)
+        )
+        self.wait()
+        self.play(
+            Write(point_of_interest_label)
+        )
+        self.wait()
+        self.play(
+            Unwrite(point_of_interest_label)
+        )
+        self.wait()
+
+        # define the alpha phase growth rate and the beta phase growth rate
+        alpha_rate = 0.5
+        beta_rate = 0.25
+
+        # define the inverted alpha and beta regions
+        alpha_tot_region_left = DashedLine(
+            start=axes.c2p(0, 0, t_n),
+            end=axes.c2p(-alpha_rate * t_n, 0, 0),
+            color=ORANGE
+        )
+        alpha_tot_region_right = DashedLine(
+            start=axes.c2p(0, 0, t_n),
+            end=axes.c2p(alpha_rate * t_n, 0, 0),
+            color=ORANGE
+        )
+        self.play(
+            Create(alpha_tot_region_left),
+            Create(alpha_tot_region_right)
+        )
+        self.wait()
+
+        beta_tot_region_left = DashedLine(
+            start=axes.c2p(0, 0, t_n),
+            end=axes.c2p(-beta_rate * t_n, 0, 0),
+            color=GREEN
+        )
+        beta_tot_region_right = DashedLine(
+            start=axes.c2p(0, 0, t_n),
+            end=axes.c2p(beta_rate * t_n, 0, 0),
+            color=GREEN
+        )
+        self.play(
+            Create(beta_tot_region_left),
+            Create(beta_tot_region_right)
+        )
+        self.wait()
+
+        # highlight Region 1 and 2
+        region_1_left = Polygon(
+            axes.c2p(0, 0, t_n),
+            axes.c2p(-alpha_rate * t_n, 0, 0),
+            axes.c2p(-beta_rate * t_n, 0, 0),
+            color=ORANGE,
+            fill_opacity=0.7,
+            stroke_width=0.3
+        )
+        region_1_right = Polygon(
+            axes.c2p(0, 0, t_n),
+            axes.c2p(alpha_rate * t_n, 0, 0),
+            axes.c2p(beta_rate * t_n, 0, 0),
+            color=ORANGE,
+            fill_opacity=0.7,
+            stroke_width=0.3
+        )
+
+        region_1_left_label = Tex("$1$").move_to(axes.c2p(-0.95, 0, 1.5)).rotate(PI / 2, axis=X_AXIS)
+        region_1_right_label = Tex("$1$").move_to(axes.c2p(0.95, 0, 1.5)).rotate(PI / 2, axis=X_AXIS)
+
+        self.play(
+            DrawBorderThenFill(region_1_left),
+            DrawBorderThenFill(region_1_right)
+        )
+        self.play(
+            Write(region_1_left_label),
+            Write(region_1_right_label)
+        )
+        self.wait()
+        self.play(
+            FadeOut(region_1_left, region_1_right, region_1_left_label, region_1_right_label)
+        )
+        self.wait()
+
+        region_2 = Polygon(
+            axes.c2p(0, 0, t_n),
+            axes.c2p(-beta_rate * t_n, 0, 0),
+            axes.c2p(beta_rate * t_n, 0, 0),
+            color=GREEN,
+            fill_opacity=0.7,
+            stroke_width=0.3
+        )
+        region_2_label = Tex("$2$").move_to(axes.c2p(0, 0, 1.5)).rotate(PI / 2, axis=X_AXIS)
+        self.play(
+            DrawBorderThenFill(region_2)
+        )
+        self.play(
+            Write(region_2_label)
+        )
+        self.wait()
+        self.play(
+            FadeOut(region_2, region_2_label)
+        )
+        self.wait()
+
+        # darken the Region 1 and 2 boundaries
+        self.play(
+            alpha_tot_region_left.animate.set_stroke(opacity=0.5),
+            alpha_tot_region_right.animate.set_stroke(opacity=0.5),
+            beta_tot_region_left.animate.set_stroke(opacity=0.5),
+            beta_tot_region_right.animate.set_stroke(opacity=0.5)
+        )
+        self.wait()
+
+        # define the alpha and beta phase growth cone
+        alpha_x_tracker = ValueTracker(1)
+        alpha_y_tracker = ValueTracker(0)
+        alpha_t_tracker = ValueTracker(1.5)
+
+        cone_t_limit = 8 * unit_z_length
+
+        alpha_cone_1d_left = always_redraw(
+            lambda:
+            Line(
+                start=axes.c2p(alpha_x_tracker.get_value(), alpha_y_tracker.get_value(), alpha_t_tracker.get_value()),
+                end=axes.c2p(alpha_x_tracker.get_value() - cone_t_limit * alpha_rate,
+                             alpha_y_tracker.get_value(), cone_t_limit + alpha_t_tracker.get_value()),
+                color=ORANGE
+            )
+        )
+        alpha_cone_1d_right = always_redraw(
+            lambda:
+            Line(
+                start=axes.c2p(alpha_x_tracker.get_value(), alpha_y_tracker.get_value(), alpha_t_tracker.get_value()),
+                end=axes.c2p(alpha_x_tracker.get_value() + cone_t_limit * alpha_rate,
+                             alpha_y_tracker.get_value(), cone_t_limit + alpha_t_tracker.get_value()),
+                color=ORANGE
+            )
+        )
+
+        beta_x_tracker = ValueTracker(-0.3)
+        beta_y_tracker = ValueTracker(0)
+        beta_t_tracker = ValueTracker(1)
+
+        cone_t_limit = 8 * unit_z_length
+
+        beta_cone_1d_left = always_redraw(
+            lambda:
+            Line(
+                start=axes.c2p(beta_x_tracker.get_value(), beta_y_tracker.get_value(), beta_t_tracker.get_value()),
+                end=axes.c2p(beta_x_tracker.get_value() - cone_t_limit * beta_rate,
+                             beta_y_tracker.get_value(), cone_t_limit + beta_t_tracker.get_value()),
+                color=GREEN
+            )
+        )
+        beta_cone_1d_right = always_redraw(
+            lambda:
+            Line(
+                start=axes.c2p(beta_x_tracker.get_value(), beta_y_tracker.get_value(), beta_t_tracker.get_value()),
+                end=axes.c2p(beta_x_tracker.get_value() + cone_t_limit * beta_rate,
+                             beta_y_tracker.get_value(), cone_t_limit + beta_t_tracker.get_value()),
+                color=GREEN
+            )
+        )
+        self.play(
+            Create(beta_cone_1d_left),
+            Create(beta_cone_1d_right),
+            run_time=1.5
+        )
+        self.play(
+            Create(alpha_cone_1d_left),
+            Create(alpha_cone_1d_right),
+            run_time=1.5
+        )
+        self.wait()
+
+        # get the impingement line
+        impingement_line = always_redraw(
+            lambda: DashedLine(
+                start=axes.c2p(((
+                                        alpha_rate * beta_rate
+                                ) / (
+                                        alpha_rate + beta_rate
+                                ) * (
+                                        (
+                                                alpha_x_tracker.get_value() / alpha_rate) + (
+                                                beta_x_tracker.get_value() / beta_rate) +
+                                        alpha_t_tracker.get_value() - beta_t_tracker.get_value()
+                                )),
+                               0,
+                               ((
+                                        beta_rate * beta_t_tracker.get_value() +
+                                        alpha_rate * alpha_t_tracker.get_value() -
+                                        beta_x_tracker.get_value() + alpha_x_tracker.get_value()
+                                ) / (
+                                        alpha_rate + beta_rate)),
+                               ),
+                end=axes.c2p(((
+                                      alpha_rate * beta_rate
+                              ) / (
+                                      alpha_rate + beta_rate
+                              ) * (
+                                      (
+                                              alpha_x_tracker.get_value() / alpha_rate) + (
+                                              beta_x_tracker.get_value() / beta_rate) +
+                                      alpha_t_tracker.get_value() - beta_t_tracker.get_value()
+                              )),
+                             0, cone_t_limit)
+            ).set_stroke(color=(ORANGE if ((
+                                                   alpha_rate * beta_rate
+                                           ) / (
+                                                   alpha_rate + beta_rate
+                                           ) * (
+                                                   (
+                                                           alpha_x_tracker.get_value() / alpha_rate) + (
+                                                           beta_x_tracker.get_value() / beta_rate) +
+                                                   alpha_t_tracker.get_value() - beta_t_tracker.get_value()
+                                           )) <= 0 else GREEN))
+        )
+        self.play(
+            Create(impingement_line)
+        )
+
+        # move the alpha cone
+        self.play(
+            alpha_x_tracker.animate.set_value(0.4),
+            alpha_t_tracker.animate.set_value(0.5),
+            run_time=2
+        )
+        self.wait()
+
+        # reframing the problem as the race to the time axis
+        # highlight the time axis
+        self.play(
+            z_axis.animate.set_color(color=YELLOW),
+            z_label.animate.set_color(color=YELLOW),
+            run_time=0.5
+        )
+        self.wait()
+
+        # add the alpha and beta dot on the time axis
+        alpha_time_dot = always_redraw(
+            lambda:
+            Dot3D(
+                point=axes.c2p(
+                    0, 0, alpha_t_tracker.get_value() + np.abs(alpha_x_tracker.get_value() / alpha_rate)
+                ),
+                color=ORANGE
+            ).set_shade_in_3d(False)
+        )
+
+        beta_time_dot = always_redraw(
+            lambda:
+            Dot3D(
+                point=axes.c2p(
+                    0, 0, beta_t_tracker.get_value() + np.abs(beta_x_tracker.get_value() / beta_rate)
+                ),
+                color=GREEN
+            ).set_shade_in_3d(False)
+        )
+
+        self.play(
+            FadeIn(alpha_time_dot)
+        )
+        self.play(
+            FadeIn(beta_time_dot)
+        )
+        self.wait()
+
+        # go back to the case when beta wins
+        self.play(
+            alpha_x_tracker.animate.set_value(1),
+            alpha_t_tracker.animate.set_value(1.5),
+            run_time=2
+        )
+        self.wait()
+
+        # move the alpha cone again and fade out the impingement line
+        self.play(
+            alpha_x_tracker.animate.set_value(0.4),
+            alpha_t_tracker.animate.set_value(0.5),
+            run_time=2
+        )
+        self.wait()
+        self.play(
+            FadeOut(impingement_line)
+        )
+        self.wait()
+
+        # add the time indicator for alpha_time_dot and beta_time_dot
+        alpha_time_height_hline = always_redraw(
+            lambda:
+            Line(
+                start=axes.c2p(-0.1, 0, alpha_t_tracker.get_value() + np.abs(alpha_x_tracker.get_value() / alpha_rate)),
+                end=axes.c2p(-0.15, 0, alpha_t_tracker.get_value() + np.abs(alpha_x_tracker.get_value() / alpha_rate)),
+                color=ORANGE
+            )
+        )
+        alpha_time_height_vline = always_redraw(
+            lambda:
+            DashedLine(
+                start=axes.c2p(-0.125, 0,
+                               alpha_t_tracker.get_value() + np.abs(alpha_x_tracker.get_value() / alpha_rate)),
+                end=axes.c2p(-0.125, 0, 0),
+                color=ORANGE
+            )
+        )
+        alpha_time_height_label = always_redraw(
+            lambda:
+            Tex("$t_a$", color=ORANGE).rotate(
+                PI / 2, axis=X_AXIS
+            ).move_to(
+                axes.c2p(-0.3, 0,
+                         (alpha_t_tracker.get_value() + np.abs(alpha_x_tracker.get_value() / alpha_rate)) / 2),
+                aligned_edge=Z_AXIS
+            )
+        )
+
+        self.play(
+            Create(alpha_time_height_hline), run_time=0.5
+        )
+        self.play(
+            Create(alpha_time_height_vline), run_time=0.7
+        )
+        self.play(
+            Write(alpha_time_height_label)
+        )
+        self.wait()
+
+        beta_time_height_hline = always_redraw(
+            lambda:
+            Line(
+                start=axes.c2p(0.1, 0, beta_t_tracker.get_value() + np.abs(beta_x_tracker.get_value() / beta_rate)),
+                end=axes.c2p(0.15, 0, beta_t_tracker.get_value() + np.abs(beta_x_tracker.get_value() / beta_rate)),
+                color=GREEN
+            )
+        )
+        beta_time_height_vline = always_redraw(
+            lambda:
+            DashedLine(
+                start=axes.c2p(0.125, 0,
+                               beta_t_tracker.get_value() + np.abs(beta_x_tracker.get_value() / beta_rate)),
+                end=axes.c2p(0.125, 0, 0),
+                color=GREEN
+            )
+        )
+        beta_time_height_label = always_redraw(
+            lambda:
+            Tex("$t_b$", color=GREEN).rotate(
+                PI / 2, axis=X_AXIS
+            ).move_to(
+                axes.c2p(0.3, 0,
+                         (beta_t_tracker.get_value() + np.abs(beta_x_tracker.get_value() / beta_rate)) / 2),
+                aligned_edge=Z_AXIS
+            )
+        )
+
+        self.play(
+            Create(beta_time_height_hline), run_time=0.5
+        )
+        self.play(
+            Create(beta_time_height_vline), run_time=0.7
+        )
+        self.play(
+            Write(beta_time_height_label)
+        )
+        self.wait()
+
+        # let t_a = t_b
+        self.play(
+            alpha_x_tracker.animate.set_value(0.85),
+            run_time=2
+        )
+        self.wait()
+
+        # stop updating time_height objects
+        alpha_time_height_label.clear_updaters()
+        alpha_time_height_hline.clear_updaters()
+        alpha_time_height_vline.clear_updaters()
+        beta_time_height_label.clear_updaters()
+        beta_time_height_hline.clear_updaters()
+        beta_time_height_vline.clear_updaters()
+
+        # write out the formula for finding the alpha wins boundary
+        self.play(
+            beta_time_height_label.animate.move_to(
+                axes.c2p(-4, 0, 3)
+            ),
+            alpha_time_height_label.animate.set_opacity(0),
+            alpha_time_height_hline.animate.set_opacity(0),
+            alpha_time_height_vline.animate.set_opacity(0)
+        )
+        self.wait()
+
+        t_b_formula = Tex(
+            "$t_b$", " $=t_\\beta+\\frac{|x_\\beta|}{\\dot{R_\\beta}}$"
+        ).move_to(
+            beta_time_height_label, aligned_edge=-X_AXIS
+        ).rotate(PI / 2, axis=X_AXIS)
+
+        t_b_formula.submobjects[0].set_opacity(0)
+
+        self.play(
+            Write(t_b_formula)
+        )
+        self.wait()
+
+        # show the t_beta segments
+        t_beta_vline_1 = DashedLine(
+            start=axes.c2p(beta_x_tracker.get_value(), 0, beta_t_tracker.get_value()),
+            end=axes.c2p(beta_x_tracker.get_value(), 0, 0)
+        )
+        t_beta_vline_2 = DashedLine(
+            start=axes.c2p(beta_x_tracker.get_value(), 0, beta_t_tracker.get_value()),
+            end=axes.c2p(beta_x_tracker.get_value(), 0,
+                         beta_t_tracker.get_value() + np.abs(beta_x_tracker.get_value() / beta_rate))
+        )
+        t_beta_hline = DashedLine(
+            start=axes.c2p(beta_x_tracker.get_value(), 0, beta_t_tracker.get_value()),
+            end=axes.c2p(0, 0, beta_t_tracker.get_value())
+        )
+        self.play(
+            Create(t_beta_vline_1)
+        )
+        self.wait()
+        self.play(
+            t_beta_vline_1.animate.set_opacity(0.5),
+            Create(t_beta_vline_2)
+        )
+        self.wait()
+        self.play(
+            Create(t_beta_hline)
+        )
+        self.wait()
+        self.play(
+            FadeOut(t_beta_vline_1, t_beta_vline_2, t_beta_hline,
+                    beta_time_height_hline, beta_time_height_vline)
+        )
+        self.wait()
+
+        # show the t_alpha segments
+        self.play(
+            alpha_time_height_label.animate.set_opacity(1),
+            alpha_time_height_hline.animate.set_opacity(1),
+            alpha_time_height_vline.animate.set_opacity(1)
+        )
+        self.play(
+            alpha_time_height_label.animate.move_to(
+                axes.c2p(-3.95, 0, 2.2)
+            )
+        )
+        self.wait()
+
+        t_a_formula_1 = Tex(
+            "$t_a$", " $=t_\\alpha+\\frac{|x_\\alpha|}{\\dot{R_\\alpha}}$"
+        ).move_to(
+            alpha_time_height_label, aligned_edge=-X_AXIS
+        ).rotate(PI / 2, axis=X_AXIS)
+
+        t_a_formula_1.submobjects[0].set_opacity(0)
+
+        self.play(
+            Write(t_a_formula_1)
+        )
+        self.wait()
+
+        t_alpha_vline = DashedLine(
+            start=axes.c2p(alpha_x_tracker.get_value(), 0, alpha_t_tracker.get_value()),
+            end=axes.c2p(alpha_x_tracker.get_value(), 0, 0)
+        )
+        t_alpha_hline = DashedLine(
+            start=axes.c2p(alpha_x_tracker.get_value(), 0, alpha_t_tracker.get_value()),
+            end=axes.c2p(0, 0, alpha_t_tracker.get_value())
+        )
+        self.play(
+            Create(t_alpha_vline)
+        )
+        self.wait()
+        self.play(
+            t_alpha_vline.animate.set_opacity(0.5),
+            Create(t_alpha_hline)
+        )
+        self.wait()
+
+        # drop the alpha subscript
+        t_a_formula_2 = Tex(
+            "$t_a$", " $=t+\\frac{|x|}{\\dot{R_\\alpha}}$"
+        ).move_to(
+            alpha_time_height_label, aligned_edge=-X_AXIS
+        ).rotate(PI / 2, axis=X_AXIS)
+
+        t_a_formula_2.submobjects[0].set_opacity(0)
+
+        self.play(
+            TransformMatchingShapes(t_a_formula_1, t_a_formula_2)
+        )
+        self.wait()
+
+        # get the boundary formula
+        t_bound_1d_formula = Tex(
+            "$t=-\\frac{1}{\\dot{R_\\alpha}}|x|+\\left(t_\\beta+\\frac{|x_\\beta|}{\\dot{R_\\beta}}\\right)$"
+        ).move_to(
+            axes.c2p(-3.9, 0, 1.2), aligned_edge=-X_AXIS
+        ).rotate(PI / 2, axis=X_AXIS)
+        t_bound_1d_formula.set_color_by_tex(
+            't', BLUE
+        )
+        t_bound_1d_formula.set_color_by_tex(
+            'x', BLUE
+        )
+
+        self.play(
+            Write(t_bound_1d_formula)
+        )
+        self.wait()
+        self.play(
+            FadeOut(
+                t_alpha_vline, t_alpha_hline, alpha_cone_1d_left, alpha_cone_1d_right,
+                alpha_time_height_hline, alpha_time_height_vline, alpha_time_dot
+            )
+        )
+        self.wait()
+
+        # move the boundary formula
+        self.play(
+            FadeOut(alpha_time_height_label, beta_time_height_label, t_a_formula_2, t_b_formula),
+            t_bound_1d_formula.animate.shift(
+                axes.c2p(0.2, 0, 2.2) - axes.c2p(0, 0, 1.2)
+            )
+        )
+        self.wait()
+
+        # draw the alpha wins region in 1d spacetime
+        alpha_wins_1d_no_intersect = Line(
+            start=axes.c2p(
+                0, 0, beta_t_tracker.get_value() + np.abs(beta_x_tracker.get_value() / beta_rate)
+            ),
+            end=axes.c2p(
+                alpha_rate * (beta_t_tracker.get_value() + np.abs(beta_x_tracker.get_value() / beta_rate)),
+                0, 0
+            ),
+            color=BLUE
+        )
+        alpha_wins_1d_with_intersect_1 = Line(
+            start=axes.c2p(
+                0, 0, beta_t_tracker.get_value() + np.abs(beta_x_tracker.get_value() / beta_rate)
+            ),
+            end=axes.c2p(
+                - alpha_rate * (beta_t_tracker.get_value() + np.abs(beta_x_tracker.get_value() / beta_rate)),
+                0, 0
+            ),
+            color=BLUE
+        )
+
+        self.play(
+            Create(alpha_wins_1d_no_intersect)
+        )
+        self.wait()
+        self.play(
+            Create(alpha_wins_1d_with_intersect_1)
+        )
+        self.wait()
+
+        alpha_wins_1d_with_intersect_2 = Line(
+            start=axes.c2p(
+                beta_x_tracker.get_value(), 0, beta_t_tracker.get_value()
+            ),
+            end=axes.c2p(
+                beta_x_tracker.get_value() - alpha_rate * beta_t_tracker.get_value(),
+                0, 0
+            ),
+            color=BLUE
+        )
+        self.play(
+            ReplacementTransform(alpha_wins_1d_with_intersect_1, alpha_wins_1d_with_intersect_2),
+            run_time=1.5
+        )
+        self.wait()
+
+        # define the alpha wins region in 1d spacetime
+        alpha_wins_1d_region_2 = always_redraw(
+            lambda:
+            Polygon(
+                axes.c2p(beta_x_tracker.get_value(), 0, beta_t_tracker.get_value()),
+                axes.c2p(0, 0, beta_t_tracker.get_value() + np.abs(beta_x_tracker.get_value() / beta_rate)),
+                axes.c2p(
+                    alpha_rate * (beta_t_tracker.get_value() + np.abs(beta_x_tracker.get_value() / beta_rate)),
+                    0, 0),
+                axes.c2p(beta_x_tracker.get_value() - alpha_rate * beta_t_tracker.get_value(), 0, 0),
+                color=BLUE,
+                fill_opacity=0.7
+            )
+        )
+        self.play(
+            DrawBorderThenFill(alpha_wins_1d_region_2),
+            FadeOut(beta_time_dot)
+        )
+        self.remove(alpha_wins_1d_with_intersect_2, alpha_wins_1d_no_intersect)
+        self.wait()
+
+        # write out the ratio
+        alpha_numerator = Tex(
+            "$||\\Omega_\\alpha||$"
+        ).move_to(
+            axes.c2p(1.75, 0, 3)
+        ).rotate(PI / 2, axis=X_AXIS)
+
+        self.play(
+            TransformFromCopy(alpha_wins_1d_region_2, alpha_numerator)
+        )
+        self.wait()
+
+        # highlight the total time cone volume
+        tot_time_cone_1d = Polygon(
+            axes.c2p(0, 0, t_n),
+            axes.c2p(alpha_rate * t_n, 0, 0),
+            axes.c2p(-alpha_rate * t_n, 0, 0),
+            color=ORANGE,
+            fill_opacity=0.7
+        )
+        self.play(
+            DrawBorderThenFill(tot_time_cone_1d)
+        )
+        self.wait()
+
+        alpha_divider = Line(
+            start=axes.c2p(1.3, 0, 2.8),
+            end=axes.c2p(2.2, 0, 2.8)
+        )
+        self.play(
+            Create(alpha_divider)
+        )
+
+        alpha_denominator = Tex(
+            "$||\\Omega_{\\text{tot}}||$"
+        ).move_to(
+            axes.c2p(1.75, 0, 2.6), aligned_edge=Z_AXIS
+        ).rotate(PI / 2, axis=X_AXIS)
+
+        self.play(
+            ReplacementTransform(tot_time_cone_1d, alpha_denominator)
+        )
+        self.wait()
+
+        # add the double integral sign
+        double_int = Tex(
+            "$\\iint$"
+        ).scale(1.5).move_to(
+            axes.c2p(1.25, 0, 2.8), aligned_edge=X_AXIS
+        ).rotate(PI / 2, axis=X_AXIS)
+        int_variables = Tex(
+            "$dx\\,dt$"
+        ).move_to(
+            axes.c2p(2.3, 0, 2.8), aligned_edge=-X_AXIS
+        ).rotate(PI / 2, axis=X_AXIS)
+
+        self.play(
+            Write(double_int),
+            Write(int_variables),
+        )
+        self.wait()
+
+
+        # move the alpha wins in Region 2
+        self.play(
+            beta_x_tracker.animate.set_value(-0.2),
+            beta_t_tracker.animate.set_value(2.2)
+        )
+        self.wait()
+        self.play(
+            beta_x_tracker.animate.set_value(0),
+        )
+        self.wait()
+        self.play(
+            beta_x_tracker.animate.set_value(-0.8),
+            beta_t_tracker.animate.set_value(0)
+        )
+        self.wait()
+        self.play(
+            beta_x_tracker.animate.set_value(-0.3),
+            beta_t_tracker.animate.set_value(1)
+        )
+        self.wait()
+
+        self.play(
+            FadeOut(double_int, int_variables, alpha_divider, alpha_numerator, alpha_denominator)
+        )
+        self.wait()
+
+        # transition into real 3d space for 2D spacetime
+        self.move_camera(
+            90 * DEGREES, -100 * DEGREES,
+        )
+        self.play(
+            LaggedStart(
+                *[
+                    Create(y_axis),
+                    Write(y_label),
+                ],
+                lag_ratio=1.1
+            ),
+            run_time=2
+        )
+        self.wait()
+
+        # fade out the alpha wins 1d region 2
+        self.play(
+            FadeOut(alpha_wins_1d_region_2)
+        )
+        self.wait()
+
+
+        # top down view for circle-circle impingement
+        self.move_camera(
+            0 * DEGREES, -90 * DEGREES,
+            frame_center=axes.c2p(0, 0, 2),
+            added_anims=[
+                FadeOut(z_axis, z_label),
+                x_axis.animate.rotate(- PI / 2, axis=X_AXIS),
+                x_label.animate.rotate(- PI / 2, axis=X_AXIS),
+                y_label.animate.rotate(- PI / 2, axis=X_AXIS)
+            ]
+        )
+        self.wait()
+
+        # return to quasi-2D view
+        self.move_camera(
+            100 * DEGREES, -90 * DEGREES,
+            frame_center=np.array([0, 0, 0]),
+            added_anims=[
+                FadeIn(z_axis, z_label),
+                FadeOut(y_axis, y_label),
+                x_axis.animate.rotate(PI / 2, axis=X_AXIS),
+                x_label.animate.rotate(PI / 2, axis=X_AXIS),
+            ]
+        )
+        self.wait()
