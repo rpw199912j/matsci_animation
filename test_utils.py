@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from itertools import product
 from manim import *
+from impingement import get_circ_intersec
 
 
 class SpecialAxes(Axes):
@@ -369,7 +370,10 @@ class TestCompetitivePhaseTransformation(ThreeDScene):
         z_axis = axes.get_z_axis()
 
         axes.x_axis = x_axis.rotate(PI / 2, axis=X_AXIS)
+        unit_y_length = axes.c2p(0, 1, 0)[1] - axes.c2p(0, 0, 0)[1]
         unit_z_length = axes.c2p(0, 0, 1)[2] - axes.c2p(0, 0, 0)[2]
+        unit_y_vector = axes.c2p(0, 1, 0) - axes.c2p(0, 0, 0)
+        unit_z_vector = axes.c2p(0, 0, 1) - axes.c2p(0, 0, 0)
 
         # add the axes labels
         x_label = axes.get_x_axis_label(Tex("$x$")).rotate(PI / 2, axis=X_AXIS)
@@ -904,16 +908,11 @@ class TestCompetitivePhaseTransformation(ThreeDScene):
 
         # get the boundary formula
         t_bound_1d_formula = Tex(
-            "$t=-\\frac{1}{\\dot{R_\\alpha}}|x|+\\left(t_\\beta+\\frac{|x_\\beta|}{\\dot{R_\\beta}}\\right)$"
+            "$t=-\\frac{1}{\\dot{R_\\alpha}}|x|+\\left(t_\\beta+\\frac{|x_\\beta|}{\\dot{R_\\beta}}\\right)$",
+            color=BLUE
         ).move_to(
             axes.c2p(-3.9, 0, 1.2), aligned_edge=-X_AXIS
         ).rotate(PI / 2, axis=X_AXIS)
-        t_bound_1d_formula.set_color_by_tex(
-            't', BLUE
-        )
-        t_bound_1d_formula.set_color_by_tex(
-            'x', BLUE
-        )
 
         self.play(
             Write(t_bound_1d_formula)
@@ -926,6 +925,8 @@ class TestCompetitivePhaseTransformation(ThreeDScene):
             )
         )
         self.wait()
+        alpha_cone_1d_left.suspend_updating()
+        alpha_cone_1d_right.suspend_updating()
 
         # move the boundary formula
         self.play(
@@ -1066,7 +1067,6 @@ class TestCompetitivePhaseTransformation(ThreeDScene):
         )
         self.wait()
 
-
         # move the alpha wins in Region 2
         self.play(
             beta_x_tracker.animate.set_value(-0.2),
@@ -1109,19 +1109,141 @@ class TestCompetitivePhaseTransformation(ThreeDScene):
         )
         self.wait()
 
-        # fade out the alpha wins 1d region 2
+        # add the alpha wins boundary
+        # write out the distance
+        generalize_to_2d = Tex(
+            "$|x|$", " $=$", " $\\sqrt{x^2+y^2}$"
+        ).move_to(
+            axes.c2p(-3.9, 0, 1.5), aligned_edge=-X_AXIS
+        ).rotate(PI / 2, axis=X_AXIS)
+
+        generalize_to_3d = Tex(
+            "$|x|$", " $=$", " $\\sqrt{x^2+y^2+z^2}$"
+        ).move_to(
+            axes.c2p(-3.9, 0, 1.5), aligned_edge=-X_AXIS
+        ).rotate(PI / 2, axis=X_AXIS)
+
         self.play(
-            FadeOut(alpha_wins_1d_region_2)
+            Write(generalize_to_2d)
+        )
+        self.wait()
+        self.play(
+            TransformMatchingTex(generalize_to_2d, generalize_to_3d)
         )
         self.wait()
 
+        # remove all the equations displayed
+        self.play(
+            FadeOut(generalize_to_2d, generalize_to_3d, t_bound_1d_formula)
+        )
 
-        # top down view for circle-circle impingement
+        # draw the extra allow region allowed due to faster growth speed
+        alpha_wins_2d_with_intersect_1 = Line(
+            start=axes.c2p(
+                0, 0, beta_t_tracker.get_value() + np.abs(beta_x_tracker.get_value() / beta_rate)
+            ),
+            end=axes.c2p(
+                - alpha_rate * (beta_t_tracker.get_value() + np.abs(beta_x_tracker.get_value() / beta_rate)),
+                0, 0
+            ),
+            color=BLUE
+        )
+        self.play(
+            Create(alpha_wins_2d_with_intersect_1)
+        )
+        self.wait()
+
+        extra_allowed_region = Polygon(
+            axes.c2p(beta_x_tracker.get_value(), 0, beta_t_tracker.get_value()),
+            axes.c2p(beta_x_tracker.get_value() - beta_rate * (
+                    (
+                            (alpha_rate - beta_rate) * np.abs(beta_x_tracker.get_value())
+                    ) / (beta_rate * (alpha_rate + beta_rate))),
+                     0,
+                     (alpha_rate - beta_rate) * np.abs(beta_x_tracker.get_value()) / (
+                             beta_rate * (alpha_rate + beta_rate)) + beta_t_tracker.get_value()
+                     ),
+            axes.c2p(
+                - alpha_rate * (beta_t_tracker.get_value() + np.abs(beta_x_tracker.get_value() / beta_rate)),
+                0, 0
+            ),
+            axes.c2p(beta_x_tracker.get_value() - alpha_rate * beta_t_tracker.get_value(), 0, 0),
+            color=YELLOW_D,
+            fill_opacity=0.7
+        )
+        self.play(
+            DrawBorderThenFill(extra_allowed_region)
+        )
+        self.wait()
+
+        # show two growing circles
+        t_tracker = ValueTracker(0)
+        # move the alpha growth cone to the boundary
+        alpha_x_tracker.set_value(
+            - alpha_rate * (beta_t_tracker.get_value() + np.abs(beta_x_tracker.get_value() / beta_rate))
+        )
+        alpha_t_tracker.set_value(0)
+        # AHA: always resume updating after the new values have been set
+        alpha_cone_1d_left.resume_updating()
+        alpha_cone_1d_right.resume_updating()
+        self.play(
+            Create(alpha_cone_1d_left),
+            Create(alpha_cone_1d_right)
+        )
+        self.wait()
+        # alpha_cone_1d_left.suspend_updating()
+        # alpha_cone_1d_right.suspend_updating()
+
+        # add the plane
+        plane = always_redraw(
+            lambda:
+            Square(side_length=5 * unit_y_length).move_to(axes.c2p(0, 0, 0)).shift(
+                t_tracker.get_value() * unit_z_vector
+            ).set_opacity(0.1).set_stroke(opacity=0.5)
+        )
+        # add the growing alpha circle
+        circ_alpha = always_redraw(
+            lambda:
+            Circle(radius=axes.c2p(t_tracker.get_value() * alpha_rate, 0, 0)[0],
+                   color=ORANGE, stroke_width=4).move_to(
+                axes.c2p(
+                    - alpha_rate * (beta_t_tracker.get_value() + np.abs(beta_x_tracker.get_value() / beta_rate)),
+                    0, 0
+                )).shift(
+                t_tracker.get_value() * unit_z_vector
+            )
+        )
+        # add the growing beta circle
+        beta_cone_time = beta_t_tracker.get_value()
+        circ_beta = always_redraw(
+            lambda:
+            Circle(radius=axes.c2p((t_tracker.get_value() - beta_cone_time) * beta_rate, 0, 0)[0],
+                   color=GREEN, stroke_width=4).move_to(
+                axes.c2p(
+                    beta_x_tracker.get_value(),
+                    0, 0
+                )).shift(
+                t_tracker.get_value() * unit_z_vector
+            ) if t_tracker.get_value() > beta_cone_time else Circle(radius=0).move_to(
+                axes.c2p(
+                    beta_x_tracker.get_value(),
+                    0, 0
+                )).shift(
+                t_tracker.get_value() * unit_z_vector
+            )
+        )
+
+        self.add(circ_alpha, circ_beta)
+        self.play(
+            DrawBorderThenFill(plane)
+        )
+        self.wait()
+
+        # move the camera to a higher altitute
         self.move_camera(
-            0 * DEGREES, -90 * DEGREES,
+            70 * DEGREES, -100 * DEGREES,
             frame_center=axes.c2p(0, 0, 2),
             added_anims=[
-                FadeOut(z_axis, z_label),
                 x_axis.animate.rotate(- PI / 2, axis=X_AXIS),
                 x_label.animate.rotate(- PI / 2, axis=X_AXIS),
                 y_label.animate.rotate(- PI / 2, axis=X_AXIS)
@@ -1129,15 +1251,86 @@ class TestCompetitivePhaseTransformation(ThreeDScene):
         )
         self.wait()
 
-        # return to quasi-2D view
-        self.move_camera(
-            100 * DEGREES, -90 * DEGREES,
-            frame_center=np.array([0, 0, 0]),
-            added_anims=[
-                FadeIn(z_axis, z_label),
-                FadeOut(y_axis, y_label),
-                x_axis.animate.rotate(PI / 2, axis=X_AXIS),
-                x_label.animate.rotate(PI / 2, axis=X_AXIS),
-            ]
+        self.play(
+            t_tracker.animate.set_value(
+                (alpha_rate - beta_rate) * np.abs(beta_x_tracker.get_value()) / (
+                        beta_rate * (alpha_rate + beta_rate)) + beta_t_tracker.get_value()
+            ),
+            run_time=3,
+            rate_func=linear
         )
         self.wait()
+
+        # add the impingement points
+        intersec_points = always_redraw(
+            lambda: get_circ_intersec(
+                - alpha_rate * (beta_t_tracker.get_value() + np.abs(beta_x_tracker.get_value() / beta_rate)), 0,
+                beta_x_tracker.get_value(), 0,
+                t_tracker.get_value() * alpha_rate, (t_tracker.get_value() - beta_cone_time) * beta_rate,
+                axes, t_tracker.get_value(),
+                radius=0.04, color=YELLOW
+            )
+        )
+        intersec_point_1_path = TracedPath(intersec_points.submobjects[0].get_center, stroke_color=PURPLE,
+                                           stroke_width=4)
+        intersec_point_2_path = TracedPath(intersec_points.submobjects[1].get_center, stroke_color=PURPLE,
+                                           stroke_width=4)
+        self.play(
+            FadeIn(intersec_points, intersec_point_1_path, intersec_point_2_path)
+        )
+
+        self.play(
+            t_tracker.animate.set_value(
+                beta_t_tracker.get_value() + np.abs(beta_x_tracker.get_value() / beta_rate)
+            ),
+            run_time=2,
+            rate_func=linear
+        )
+        self.wait()
+
+        # reset the time to zero
+        # self.play(
+        #     t_tracker.animate.set_value(
+        #         0
+        #     ),
+        #     run_time=1
+        # )
+        # self.wait()
+
+        # # fade out the alpha wins 1d region 2
+        # self.play(
+        #     FadeOut(alpha_wins_1d_region_2)
+        # )
+        # self.wait()
+        #
+        # top down view for circle-circle impingement
+        # self.move_camera(
+        #     0 * DEGREES, -90 * DEGREES,
+        #     frame_center=axes.c2p(0, 0, 2),
+        #     added_anims=[
+        #         FadeOut(z_axis, z_label)
+        #     ]
+        # )
+        # self.wait()
+        #
+        # self.play(
+        #     t_tracker.animate.set_value(
+        #         beta_t_tracker.get_value() + np.abs(beta_x_tracker.get_value() / beta_rate)
+        #     ),
+        #     run_time=3,
+        #     rate_func=linear
+        # )
+        # self.wait()
+
+        # # return to quasi-2D view
+        # self.move_camera(
+        #     100 * DEGREES, -90 * DEGREES,
+        #     frame_center=np.array([0, 0, 0]),
+        #     added_anims=[
+        #         FadeIn(z_axis, z_label),
+        #         FadeOut(y_axis, y_label),
+        #         x_axis.animate.rotate(PI / 2, axis=X_AXIS),
+        #         x_label.animate.rotate(PI / 2, axis=X_AXIS),
+        #     ]
+        # )
+        # self.wait()
