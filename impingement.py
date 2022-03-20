@@ -2,11 +2,21 @@ from manim import *
 
 
 # noinspection DuplicatedCode
-def get_circ_intersec(x1, y1, x2, y2, r1, r2):
+def get_circ_intersec(x1, y1, x2, y2, r1, r2, axes: ThreeDAxes = None, t=0, **kwargs):
+    x1 = axes.c2p(x1, 0, 0)[0]
+    y1 = axes.c2p(0, y1, 0)[1]
+    x2 = axes.c2p(x2, 0, 0)[0]
+    y2 = axes.c2p(0, y2, 0)[1]
     distance = np.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
+
+    t = axes.c2p(0, 0, t)[2]
+
+    r1 = (axes.c2p(r1, 0, 0) - axes.c2p(0, 0, 0))[0]
+    r2 = (axes.c2p(r2, 0, 0) - axes.c2p(0, 0, 0))[0]
+
     # when there is no intersection between the 2 circles
-    if distance > (r1 + r2) or max(r1, r2) > (min(r1, r2) + distance):
-        return VGroup(VMobject(), VMobject())
+    # if distance > (r1 + r2) or max(r1, r2) > (min(r1, r2) + distance):
+    #     return VGroup(VMobject(), VMobject())
 
     delta = 0.25 * np.sqrt((distance + r1 + r2) * (distance + r1 - r2) * (distance - r1 + r2) * (-distance + r1 + r2))
     pm, mp = np.array([1, -1]), np.array([-1, 1])
@@ -15,8 +25,8 @@ def get_circ_intersec(x1, y1, x2, y2, r1, r2):
     intersec_1_y, intersec_2_y = (y1 + y2) / 2 + (y2 - y1) * (r1 ** 2 - r2 ** 2) / (2 * distance ** 2) + 2 * mp * (
             x1 - x2) * delta / distance ** 2
 
-    return VGroup(Dot(point=np.array([intersec_1_x, intersec_1_y, 0])),
-                  Dot(point=np.array([intersec_2_x, intersec_2_y, 0])))
+    return VGroup(Dot3D(point=np.array([intersec_1_x, intersec_1_y, t]), **kwargs),
+                  Dot3D(point=np.array([intersec_2_x, intersec_2_y, t]), **kwargs))
 
 
 class TwoCircleImpingement(Scene):
