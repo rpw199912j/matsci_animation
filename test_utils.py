@@ -1268,7 +1268,7 @@ class TestCompetitivePhaseTransformation(ThreeDScene):
                 beta_x_tracker.get_value(), 0,
                 t_tracker.get_value() * alpha_rate, (t_tracker.get_value() - beta_cone_time) * beta_rate,
                 axes, t_tracker.get_value(),
-                radius=0.04, color=YELLOW
+                radius=0.06, color=YELLOW
             )
         )
         intersec_point_1_path = TracedPath(intersec_points.submobjects[0].get_center, stroke_color=PURPLE,
@@ -1288,14 +1288,26 @@ class TestCompetitivePhaseTransformation(ThreeDScene):
         )
         self.wait()
 
-        # reset the time to zero
-        # self.play(
-        #     t_tracker.animate.set_value(
-        #         0
-        #     ),
-        #     run_time=1
-        # )
-        # self.wait()
+        # reset the time to the time of impingement
+        self.play(
+            t_tracker.animate.set_value(
+                (alpha_rate - beta_rate) * np.abs(beta_x_tracker.get_value()) / (
+                        beta_rate * (alpha_rate + beta_rate)) + beta_t_tracker.get_value()
+            ),
+            FadeOut(intersec_point_1_path, intersec_point_2_path),
+            run_time=1
+        )
+        self.wait()
+
+        # redefine the traced paths
+        intersec_point_1_path = TracedPath(intersec_points.submobjects[0].get_center, stroke_color=PURPLE,
+                                           stroke_width=4)
+        intersec_point_2_path = TracedPath(intersec_points.submobjects[1].get_center, stroke_color=PURPLE,
+                                           stroke_width=4)
+        self.play(
+            FadeIn(intersec_point_1_path, intersec_point_2_path),
+            run_time=0.5
+        )
 
         # # fade out the alpha wins 1d region 2
         # self.play(
@@ -1304,23 +1316,177 @@ class TestCompetitivePhaseTransformation(ThreeDScene):
         # self.wait()
         #
         # top down view for circle-circle impingement
-        # self.move_camera(
-        #     0 * DEGREES, -90 * DEGREES,
-        #     frame_center=axes.c2p(0, 0, 2),
-        #     added_anims=[
-        #         FadeOut(z_axis, z_label)
-        #     ]
-        # )
-        # self.wait()
-        #
-        # self.play(
-        #     t_tracker.animate.set_value(
-        #         beta_t_tracker.get_value() + np.abs(beta_x_tracker.get_value() / beta_rate)
-        #     ),
-        #     run_time=3,
-        #     rate_func=linear
-        # )
-        # self.wait()
+        self.move_camera(
+            0 * DEGREES, -90 * DEGREES,
+            frame_center=axes.c2p(0, 0, 2),
+            added_anims=[
+                FadeOut(z_axis, z_label)
+            ]
+        )
+        self.wait()
+
+        self.play(
+            t_tracker.animate.set_value(
+                beta_t_tracker.get_value() + np.abs(beta_x_tracker.get_value() / beta_rate)
+            ),
+            run_time=3,
+            rate_func=linear
+        )
+        self.wait()
+
+        # fadeout all the unused mobjects
+        self.play(
+            FadeOut(circ_alpha),
+            FadeOut(
+                intersec_points, intersec_point_1_path, intersec_point_2_path
+            )
+        )
+        self.wait()
+        intersec_points.suspend_updating()
+        intersec_point_1_path.suspend_updating()
+        intersec_point_2_path.suspend_updating()
+        circ_alpha.suspend_updating()
+
+        # move the camera back to the 3D view with a higher altitute
+        self.move_camera(
+            70 * DEGREES, -100 * DEGREES,
+            added_anims=[
+                FadeIn(z_axis, z_label)
+            ]
+        )
+        self.wait()
+
+        # VISUALIZE THE CONES AND INTERSECTION OF CIRCLES
+        # set the time tracker back to 0
+        self.play(
+            t_tracker.animate.set_value(0),
+            run_time=3,
+            rate_func=linear
+        )
+        self.wait()
+
+        alpha_cone_radius = (axes.c2p(
+            alpha_rate * (beta_t_tracker.get_value() + np.abs(beta_x_tracker.get_value() / beta_rate)), 0, 0
+        ) - axes.c2p(0, 0, 0))[0]
+        alpha_cone_height = (axes.c2p(
+            0, 0, beta_t_tracker.get_value() + np.abs(beta_x_tracker.get_value() / beta_rate)
+        ) - axes.c2p(0, 0, 0))[2]
+        alpha_win_cone = Cone(
+            base_radius=alpha_cone_radius,
+            height=alpha_cone_height,
+            stroke_color=BLUE,
+            fill_color=BLUE,
+            fill_opacity=0.3,
+            stroke_opacity=0,
+            resolution=50
+        ).move_to(
+            axes.c2p(0, 0, 0), aligned_edge=-Z_AXIS
+        )
+
+        beta_cone_radius = (axes.c2p(
+            np.abs(beta_x_tracker.get_value()), 0, 0
+        ) - axes.c2p(
+            0, 0, 0))[0]
+        beta_cone_height = (axes.c2p(
+            0, 0, beta_t_tracker.get_value() + np.abs(beta_x_tracker.get_value() / beta_rate)
+        ) - axes.c2p(
+            0, 0, beta_t_tracker.get_value()))[2]
+        beta_cone = Cone(
+            base_radius=beta_cone_radius,
+            height=beta_cone_height,
+            stroke_color=GREEN_E,
+            fill_color=GREEN_E,
+            fill_opacity=0.2,
+            stroke_opacity=0,
+            show_base=True,
+            direction=-Z_AXIS,
+            resolution=50
+        ).move_to(
+            axes.c2p(
+                beta_x_tracker.get_value(), 0, beta_t_tracker.get_value()
+            ), aligned_edge=-Z_AXIS
+        )
+
+        self.play(
+            Create(alpha_win_cone),
+            Create(beta_cone)
+        )
+        self.play(
+            FadeOut(alpha_wins_1d_region_2, extra_allowed_region)
+        )
+        self.wait()
+
+        alpha_wins_circle = always_redraw(
+            lambda:
+            Circle(radius=axes.c2p(
+                (
+                        alpha_rate * (beta_t_tracker.get_value() + np.abs(beta_x_tracker.get_value() / beta_rate))
+                ) - t_tracker.get_value() * alpha_rate,
+                0, 0)[0],
+                   color=BLUE, stroke_width=4).move_to(
+                axes.c2p(0, 0, 0)).shift(
+                t_tracker.get_value() * unit_z_vector
+            )
+        )
+
+        circ_overlap = always_redraw(
+            lambda:
+            Intersection(alpha_wins_circle, circ_beta,
+                         color=PURPLE, fill_color=YELLOW, fill_opacity=1, stroke_width=2).shift(
+                axes.c2p(0, 0, t_tracker.get_value()) - np.array([0, 0, 0])
+            )
+        )
+
+        self.play(
+            FadeIn(alpha_wins_circle, circ_overlap)
+        )
+
+        # move the time to t_beta
+        self.play(
+            t_tracker.animate.set_value(beta_t_tracker.get_value()),
+            run_time=2,
+            rate_func=linear
+        )
+        self.wait()
+        # move the time to impingement time
+        self.play(
+            t_tracker.animate.set_value(
+                (alpha_rate - beta_rate) * np.abs(beta_x_tracker.get_value()) / (
+                        beta_rate * (alpha_rate + beta_rate)) + beta_t_tracker.get_value()
+            ),
+            run_time=2,
+            rate_func=linear
+        )
+        self.wait()
+        # move the time to impingement time
+        self.play(
+            t_tracker.animate.set_value(
+                beta_t_tracker.get_value() + np.abs(beta_x_tracker.get_value() / beta_rate)
+            ),
+            run_time=2,
+            rate_func=linear
+        )
+        self.wait()
+
+        # fade out all the unused mobjects
+        self.play(
+            FadeOut(circ_overlap)
+        )
+
+        # move the time back to zero
+        self.play(
+            t_tracker.animate.set_value(0),
+            run_time=2,
+            rate_func=linear
+        )
+        self.wait()
+
+        # SHOW THE 3D SPACETIME VERSION
+
+
+
+
+
 
         # # return to quasi-2D view
         # self.move_camera(
