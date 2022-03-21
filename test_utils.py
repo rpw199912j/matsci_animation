@@ -28,17 +28,31 @@ class TestNewAxes(Scene):
 
 
 # import the plotting data
+saved_1d_spacetime = pd.read_csv("./data/1d_spacetime_results.csv")
+saved_1d_contours = pd.read_csv("./data/1d_spacetime_contours.csv")
 saved_2d_spacetime = pd.read_csv("./data/2d_spacetime_results.csv")
 saved_2d_contours = pd.read_csv("./data/2d_spacetime_contours.csv")
+saved_3d_spacetime = pd.read_csv("./data/3d_spacetime_results.csv")
+saved_3d_contours = pd.read_csv("./data/3d_spacetime_contours.csv")
 
 # get the contour levels
-contour_levels = saved_2d_contours["level"].unique()
+contour_levels_1d = saved_1d_contours["level"].unique()
+contour_levels_2d = saved_2d_contours["level"].unique()
+contour_levels_3d = saved_3d_contours["level"].unique()
 
 # shift the x, y values so that the smallest (x, y) pair is at (0, 0)
 shift_by = 2
-contour_lines = [
+contour_lines_1d = [
+    (saved_1d_contours[saved_1d_contours["level"] == level_val][["x", "y"]] + shift_by).to_numpy()
+    for level_val in contour_levels_1d
+]
+contour_lines_2d = [
     (saved_2d_contours[saved_2d_contours["level"] == level_val][["x", "y"]] + shift_by).to_numpy()
-    for level_val in contour_levels
+    for level_val in contour_levels_2d
+]
+contour_lines_3d = [
+    (saved_3d_contours[saved_3d_contours["level"] == level_val][["x", "y"]] + shift_by).to_numpy()
+    for level_val in contour_levels_3d
 ]
 
 # define the nucleation and growth rate ratios
@@ -46,39 +60,50 @@ nuc_rate_ratios = np.logspace(start=-2, stop=2, num=100)
 growth_rate_ratios = np.logspace(start=-2, stop=2, num=100)
 
 # get the probabilities when alpha wins and those when beta wins
-alpha_wins_probs: np.ndarray = saved_2d_spacetime["alpha_wins_probs"].to_numpy()
-beta_wins_probs: np.ndarray = saved_2d_spacetime["beta_wins_probs"].to_numpy()
+alpha_wins_probs_1d: np.ndarray = saved_1d_spacetime["alpha_wins_probs"].to_numpy()
+beta_wins_probs_1d: np.ndarray = saved_1d_spacetime["beta_wins_probs"].to_numpy()
+alpha_wins_probs_2d: np.ndarray = saved_2d_spacetime["alpha_wins_probs"].to_numpy()
+beta_wins_probs_2d: np.ndarray = saved_2d_spacetime["beta_wins_probs"].to_numpy()
+alpha_wins_probs_3d: np.ndarray = saved_3d_spacetime["alpha_wins_probs"].to_numpy()
+beta_wins_probs_3d: np.ndarray = saved_3d_spacetime["beta_wins_probs"].to_numpy()
 
-growth_rate_ratios_3d = [
-    growth_ratio
-    for _, growth_ratio in product(nuc_rate_ratios, growth_rate_ratios)
-]
-nuc_rate_ratios_3d = [
-    nuc_rate_ratio
-    for nuc_rate_ratio, _ in product(nuc_rate_ratios, growth_rate_ratios)
-]
+prob_ratios_1d = alpha_wins_probs_1d / beta_wins_probs_1d
+prob_ratios_2d = alpha_wins_probs_2d / beta_wins_probs_2d
+prob_ratios_3d = alpha_wins_probs_3d / beta_wins_probs_3d
 
-prob_ratios = alpha_wins_probs / beta_wins_probs
-
-prob_ratios_reshaped = prob_ratios.reshape((len(nuc_rate_ratios), len(growth_rate_ratios)))
+prob_ratios_reshaped_1d = prob_ratios_1d.reshape((len(nuc_rate_ratios), len(growth_rate_ratios)))
+prob_ratios_reshaped_2d = prob_ratios_2d.reshape((len(nuc_rate_ratios), len(growth_rate_ratios)))
+prob_ratios_reshaped_3d = prob_ratios_3d.reshape((len(nuc_rate_ratios), len(growth_rate_ratios)))
 
 nuc_rate_ratios_log10 = np.log10(nuc_rate_ratios)
 growth_rate_ratios_log10 = np.log10(growth_rate_ratios)
-prob_ratios_log10 = np.log10(prob_ratios_reshaped).T
 
-prob_ratios_log10 += 6
+prob_ratios_log10_1d = np.log10(prob_ratios_reshaped_1d).T
+prob_ratios_log10_2d = np.log10(prob_ratios_reshaped_2d).T
+prob_ratios_log10_3d = np.log10(prob_ratios_reshaped_3d).T
+
+prob_ratios_log10_1d += 8
+prob_ratios_log10_2d += 8
+prob_ratios_log10_3d += 8
 
 
 class TestParametricSurface(ThreeDScene):
 
     @staticmethod
-    def get_z_value(x, y):
-        # return x + y
-        return prob_ratios_log10[x, y]
+    def get_z_value_1d(x, y):
+        return prob_ratios_log10_1d[x, y]
+
+    @staticmethod
+    def get_z_value_2d(x, y):
+        return prob_ratios_log10_2d[x, y]
+
+    @staticmethod
+    def get_z_value_3d(x, y):
+        return prob_ratios_log10_3d[x, y]
 
     def construct(self):
         # define the axes
-        x_max, z_max = 4, 13
+        x_max, z_max = 4, 17
         y_max = x_max
 
         axes_3d = ThreeDAxes(
@@ -94,21 +119,49 @@ class TestParametricSurface(ThreeDScene):
         y_axis = axes_3d.get_y_axis()
         z_axis = axes_3d.get_z_axis()
 
+        # add the custom labels
+        values_x = [
+            (_, tick_label) for _, tick_label in enumerate(["-2", "-1", "0", "1", "2"])
+        ]
+        values_z = [
+            (_, str(tick_label))
+            for _, tick_label in enumerate(np.arange(-8, 8 + 1))
+        ]
+
+        x_axis_labels = VGroup()
+        y_axis_labels = VGroup()
+        z_axis_labels = VGroup()
+
+        for x_val, x_tex in values_x:
+            tex = Tex(x_tex)  # Convert string to tex
+            tex.next_to(x_axis.n2p(x_val), DOWN)  # Put tex on the position
+            x_axis_labels.add(tex)
+
+        for y_val, y_tex in values_x:
+            tex = Tex(y_tex)  # Convert string to tex
+            tex.next_to(y_axis.n2p(y_val), LEFT)  # Put tex on the position
+            y_axis_labels.add(tex)
+
+        for z_val, z_tex in values_z:
+            tex = Tex(z_tex, font_size=20)  # Convert string to tex
+            tex.next_to(z_axis.n2p(z_val), LEFT).rotate(PI / 2, axis=X_AXIS)  # Put tex on the position
+            z_axis_labels.add(tex)
+
         # get the unit length for the axes
         unit_y_length = axes_3d.c2p(0, 1, 0)[1] - axes_3d.c2p(0, 0, 0)[1]
 
         x_label = axes_3d.get_x_axis_label(Tex("$\\log_{10}\\left(\\frac{\\dot{R_\\alpha}}{\\dot{R_\\beta}}\\right)$"))
         y_label = axes_3d.get_y_axis_label(
             Tex("$\\log_{10}\\left(\\frac{J_\\alpha}{J_\\beta}\\right)$"),
-            edge=LEFT, direction=LEFT, buff=0.4
+            edge=LEFT, direction=LEFT, buff=0.6
         )
         z_label = axes_3d.get_z_axis_label(Tex(
-            "$\\log_{10}\\left(\\frac{P_\\alpha}{P_\\beta}\\right)$",
+            "$\\log_{10}\\left(\\frac{P(\\alpha)}{P(\\beta)}\\right)$",
             font_size=30
         ))
 
         # add the quasi-2d axes
-        self.add(x_axis, y_axis)
+        self.add(x_axis, y_axis, x_axis_labels, y_axis_labels)
         self.play(
             Write(y_label)
         )
@@ -139,7 +192,8 @@ class TestParametricSurface(ThreeDScene):
         )
         self.play(
             Create(example_point_vline),
-            Create(example_point_hline)
+            Create(example_point_hline),
+            run_time=0.5
         )
         self.play(
             Write(example_point_label)
@@ -154,14 +208,22 @@ class TestParametricSurface(ThreeDScene):
         # create the dots
         sampling_number = 100
         sampling_unit_increment = x_max / sampling_number
-        dots_on_2d_plane = [Dot(point=axes_3d.c2p((row_index + 0.5) * sampling_unit_increment,
+        # 1D Space-time
+        dots_on_plane_1d = [Dot(point=axes_3d.c2p((row_index + 0.5) * sampling_unit_increment,
                                                   (col_index + 0.5) * sampling_unit_increment, 0),
-                                radius=(axes_3d.c2p(0.2 * sampling_unit_increment, 0, 0) - axes_3d.c2p(0, 0, 0))[0])
+                                radius=(axes_3d.c2p(0.5 * sampling_unit_increment, 0, 0) - axes_3d.c2p(0, 0, 0))[0]
+                                ).set_color(interpolate_color(PURE_GREEN, ORANGE,
+                                                              (self.get_z_value_1d(row_index, col_index) + np.abs(
+                                                                  np.min(prob_ratios_log10_1d)
+                                                              )) / (np.max(prob_ratios_log10_1d) + np.abs(
+                                                                  np.min(prob_ratios_log10_1d)
+                                                              ))))
                             for row_index in range(sampling_number) for col_index in range(sampling_number)
                             ]
-        dots_on_2d_plane = VGroup(*dots_on_2d_plane)
+        dots_on_plane_1d = VGroup(*dots_on_plane_1d)
+
         self.play(
-            FadeIn(dots_on_2d_plane)
+            FadeIn(dots_on_plane_1d)
         )
 
         # re-orient the camera to move from quasi-2d to 3d
@@ -175,18 +237,19 @@ class TestParametricSurface(ThreeDScene):
             LaggedStart(
                 *[
                     Create(z_axis),
-                    Write(z_label)
+                    Write(z_label),
+                    Write(z_axis_labels)
                 ],
                 lag_ratio=1.2
             )
         )
 
         # shift the position of each dot
-        shift_vectors = [
+        shift_vectors_1d = [
             axes_3d.c2p(
                 (row_index + 0.5) * sampling_unit_increment,
                 (col_index + 0.5) * sampling_unit_increment,
-                self.get_z_value(row_index, col_index)
+                self.get_z_value_1d(row_index, col_index)
             ) - axes_3d.c2p(
                 (row_index + 0.5) * sampling_unit_increment,
                 (col_index + 0.5) * sampling_unit_increment,
@@ -194,24 +257,101 @@ class TestParametricSurface(ThreeDScene):
             )
             for row_index in range(sampling_number) for col_index in range(sampling_number)
         ]
+        shift_vectors_1d_to_2d = [
+            axes_3d.c2p(
+                (row_index + 0.5) * sampling_unit_increment,
+                (col_index + 0.5) * sampling_unit_increment,
+                self.get_z_value_2d(row_index, col_index)
+            ) - axes_3d.c2p(
+                (row_index + 0.5) * sampling_unit_increment,
+                (col_index + 0.5) * sampling_unit_increment,
+                self.get_z_value_1d(row_index, col_index)
+            )
+            for row_index in range(sampling_number) for col_index in range(sampling_number)
+        ]
+        shift_vectors_2d_to_3d = [
+            axes_3d.c2p(
+                (row_index + 0.5) * sampling_unit_increment,
+                (col_index + 0.5) * sampling_unit_increment,
+                self.get_z_value_3d(row_index, col_index)
+            ) - axes_3d.c2p(
+                (row_index + 0.5) * sampling_unit_increment,
+                (col_index + 0.5) * sampling_unit_increment,
+                self.get_z_value_2d(row_index, col_index)
+            )
+            for row_index in range(sampling_number) for col_index in range(sampling_number)
+        ]
+        shift_vectors_3d_to_1d = [
+            axes_3d.c2p(
+                (row_index + 0.5) * sampling_unit_increment,
+                (col_index + 0.5) * sampling_unit_increment,
+                self.get_z_value_1d(row_index, col_index)
+            ) - axes_3d.c2p(
+                (row_index + 0.5) * sampling_unit_increment,
+                (col_index + 0.5) * sampling_unit_increment,
+                self.get_z_value_3d(row_index, col_index)
+            )
+            for row_index in range(sampling_number) for col_index in range(sampling_number)
+        ]
         self.play(
             LaggedStart(
                 *[dot.animate.shift(shift_vector)
-                  for dot, shift_vector in zip(dots_on_2d_plane, shift_vectors)],
+                  for dot, shift_vector in zip(dots_on_plane_1d, shift_vectors_1d)],
                 lag_ratio=0.3
             ),
             run_time=5
         )
         self.wait()
 
+        # move the camera
+        self.move_camera(
+            phi=80 * DEGREES, theta=-120 * DEGREES,
+            frame_center=axes_3d.get_center()
+        )
+        # SECTION HERE
+
+        # transition into 2d
+        self.play(
+            *[dot.animate.shift(shift_vector) for dot, shift_vector in zip(dots_on_plane_1d,
+                                                                           shift_vectors_1d_to_2d)],
+            run_time=1,
+        )
+        self.wait()
+        # SECTION HERE
+        # transition into 3d
+        self.play(
+            *[dot.animate.shift(shift_vector) for dot, shift_vector in zip(dots_on_plane_1d,
+                                                                           shift_vectors_2d_to_3d)],
+            run_time=1,
+        )
+        self.wait()
+        # SECTION HERE
+
+        # # SECTION HERE
+        # rotate the camera !!!
+        self.begin_ambient_camera_rotation(
+            rate=-33 * DEGREES,
+        )
+        self.wait(10)
+        self.stop_ambient_camera_rotation()
+        self.set_camera_orientation(
+            phi=80 * DEGREES, theta=-90 * DEGREES,
+            frame_center=axes_3d.get_center()
+        )
+        # SECTION HERE
+
+        # transition back to 1d
+        self.play(
+            *[dot.animate.shift(shift_vector) for dot, shift_vector in zip(dots_on_plane_1d,
+                                                                           shift_vectors_3d_to_1d)],
+            run_time=1,
+        )
+        self.wait()
+
         # add the surface
         surface = Surface(
             lambda u, v: axes_3d.c2p(
-                u, v, self.get_z_value(
-                    int(np.round(u / (4 / 99))),
-                    int(np.round(v / (4 / 99)))
-                    # u, v
-                )
+                u, v, self.get_z_value_1d(int(np.round(u / (4 / 99))), int(np.round(v / (4 / 99))))
             ),
             resolution=(sampling_number - 1, sampling_number - 1),
             u_range=[0, x_max],
@@ -225,50 +365,87 @@ class TestParametricSurface(ThreeDScene):
 
         self.play(
             Create(surface),
-            FadeOut(dots_on_2d_plane)
+            FadeOut(dots_on_plane_1d)
         )
         self.wait()
 
         # add the contour lines
-        contours = [
+        contours_1d = [
             axes_3d.plot_line_graph(
                 x_values=contour_coords[:, 0],
                 y_values=contour_coords[:, 1],
                 add_vertex_dots=False
             ).set_color(
-                interpolate_color(PURE_GREEN, "#f06b0c", _ / len(contour_lines))
+                interpolate_color(PURE_GREEN, "#f06b0c", _ / len(contour_lines_1d))
             )
-            for _, contour_coords in enumerate(contour_lines)
+            for _, contour_coords in enumerate(contour_lines_1d)
+        ]
+        # add the contour labels
+        contours_1d_labels = [
+            Tex(
+                f"{_ - 4}", font_size=25
+            ).add_background_rectangle().move_to(
+                axes_3d.c2p(
+                    contour_coords[contour_coords.shape[0] // 2, 0],
+                    contour_coords[contour_coords.shape[0] // 2, 1],
+                    0
+                )
+            )
+            for _, contour_coords in enumerate(contour_lines_1d)
+        ]
+        contours_2d_labels = [
+            Tex(
+                f"{_ - 6}", font_size=25
+            ).add_background_rectangle().move_to(
+                axes_3d.c2p(
+                    contour_coords[contour_coords.shape[0] // 2, 0],
+                    contour_coords[contour_coords.shape[0] // 2, 1],
+                    0
+                )
+            )
+            for _, contour_coords in enumerate(contour_lines_2d)
+        ]
+        contours_3d_labels = [
+            Tex(
+                f"{_ - 8}", font_size=25
+            ).add_background_rectangle().move_to(
+                axes_3d.c2p(
+                    contour_coords[contour_coords.shape[0] // 2, 0],
+                    contour_coords[contour_coords.shape[0] // 2, 1],
+                    0
+                )
+            )
+            for _, contour_coords in enumerate(contour_lines_3d)
         ]
 
-        # recreate the contours lines to be shifted upward
-        contours_shifted = [
+        # recreate the contours_1d lines to be shifted upward
+        contours_shifted_1d = [
             axes_3d.plot_line_graph(
                 x_values=contour_coords[:, 0],
                 y_values=contour_coords[:, 1],
                 add_vertex_dots=False
             ).set_color(
-                interpolate_color(PURE_GREEN, "#f06b0c", _ / len(contour_lines))
+                interpolate_color(PURE_GREEN, "#f06b0c", _ / len(contour_lines_1d))
             )
-            for _, contour_coords in enumerate(contour_lines)
+            for _, contour_coords in enumerate(contour_lines_1d)
         ]
-        contours_shifted = [
+        contours_shifted_1d = [
             contour.shift(
-                axes_3d.c2p(0, 0, _) - axes_3d.c2p(0, 0, 0)
+                axes_3d.c2p(0, 0, _ + 4) - axes_3d.c2p(0, 0, 0)
             )
-            for _, contour in enumerate(contours_shifted)
+            for _, contour in enumerate(contours_shifted_1d)
         ]
 
         # add the slicing planes
         slicing_planes = [
             Square(side_length=y_max * unit_y_length).move_to(
-                axes_3d.c2p(x_max / 2, y_max / 2, _)
+                axes_3d.c2p(x_max / 2, y_max / 2, _ + 4)
             ).set_opacity(0.2).set_stroke(opacity=0.2).set_shade_in_3d()
-            for _ in range(len(contours_shifted))
+            for _ in range(len(contours_shifted_1d))
         ]
 
-        prev_slice = contours[0]
-        slice_shifted = contours_shifted[0]
+        prev_slice = contours_1d[0]
+        slice_shifted = contours_shifted_1d[0]
         slicing_plane = slicing_planes[0]
 
         self.play(
@@ -284,7 +461,7 @@ class TestParametricSurface(ThreeDScene):
                 prev_slice
             )
         )
-        for contour, contour_shifted, slice_plane in zip(contours[1:], contours_shifted[1:],
+        for contour, contour_shifted, slice_plane in zip(contours_1d[1:], contours_shifted_1d[1:],
                                                          slicing_planes[1:]):
             self.play(
                 TransformFromCopy(
@@ -313,18 +490,147 @@ class TestParametricSurface(ThreeDScene):
         self.move_camera(
             phi=0 * DEGREES, theta=-90 * DEGREES,
             added_anims=[
-                FadeOut(z_axis, z_label)
+                FadeOut(z_axis, z_label, z_axis_labels)
             ]
         )
         self.wait()
 
-        # rotate the camera around z-axis
-        # self.begin_ambient_camera_rotation(
-        #     rate=0.2
-        # )
-        # self.wait(5)
-        # self.stop_ambient_camera_rotation()
-        # self.wait()
+        self.play(
+            FadeIn(*contours_1d_labels)
+        )
+        self.wait()
+
+        # add two horizontal lines
+        hline_1 = DashedLine(
+            start=axes_3d.c2p(0, 2.5, 0),
+            end=axes_3d.c2p(4, 2.5, 0),
+        )
+        hline_2 = DashedLine(
+            start=axes_3d.c2p(0, 1.5, 0),
+            end=axes_3d.c2p(4, 1.5, 0),
+        )
+        v_line_1d = DashedLine(
+            start=axes_3d.c2p(1.55, 2.5, 0),
+            end=axes_3d.c2p(1.55, 1.5, 0),
+        )
+
+
+        self.play(
+            Create(hline_1),
+            Create(hline_2)
+        )
+        # SECTION HERE
+        self.play(
+            Create(v_line_1d)
+        )
+        # SECTION HERE
+        self.play(
+            FadeOut(v_line_1d)
+        )
+        # SECTION HERE
+
+        self.play(
+            FadeOut(*contours_1d_labels)
+        )
+        self.wait()
+
+        # SECTION HERE
+
+        # transform into the countour lines in 2d and 3d space-time
+        contours_2d = [
+            axes_3d.plot_line_graph(
+                x_values=contour_coords[:, 0],
+                y_values=contour_coords[:, 1],
+                add_vertex_dots=False
+            ).set_color(
+                interpolate_color(PURE_GREEN, "#f06b0c", _ / len(contour_lines_2d))
+            )
+            for _, contour_coords in enumerate(contour_lines_2d)
+        ]
+
+        contours_3d = [
+            axes_3d.plot_line_graph(
+                x_values=contour_coords[:, 0],
+                y_values=contour_coords[:, 1],
+                add_vertex_dots=False
+            ).set_color(
+                interpolate_color(PURE_GREEN, "#f06b0c", _ / len(contour_lines_3d))
+            )
+            for _, contour_coords in enumerate(contour_lines_3d)
+        ]
+
+        self.play(
+            *[
+                ReplacementTransform(contour_1d, countour_2d)
+                for contour_1d, countour_2d in zip(contours_1d, contours_2d[:len(contours_1d)])
+            ],
+            *[
+                FadeIn(countour_2d)
+                for countour_2d in contours_2d[len(contours_1d):]
+            ]
+        )
+        self.wait()
+
+        self.play(
+            FadeIn(*contours_2d_labels)
+        )
+        self.wait()
+
+        v_line_2d = DashedLine(
+            start=axes_3d.c2p(1.85, 2.5, 0),
+            end=axes_3d.c2p(1.85, 1.5, 0),
+        )
+        # SECTION HERE
+        self.play(
+            Create(v_line_2d)
+        )
+        # SECTION HERE
+        self.play(
+            FadeOut(v_line_2d)
+        )
+
+        self.play(
+            FadeOut(*contours_2d_labels)
+        )
+        self.wait()
+        # SECTION HERE
+
+        self.play(
+            *[
+                ReplacementTransform(contour_2d, countour_3d)
+                for contour_2d, countour_3d in zip(contours_2d, contours_3d[:len(contours_2d)])
+            ],
+            *[
+                FadeIn(countour_3d)
+                for countour_3d in contours_3d[len(contours_2d):]
+            ]
+        )
+        self.wait()
+        self.play(
+            FadeIn(*contours_3d_labels)
+        )
+        self.wait()
+        v_line_3d = DashedLine(
+            start=axes_3d.c2p(1.9, 2.5, 0),
+            end=axes_3d.c2p(1.9, 1.5, 0),
+        )
+        # SECTION HERE
+        self.play(
+            Create(v_line_3d)
+        )
+        # SECTION HERE
+        self.wait()
+
+        # add the observation statement
+        observation = Tex(
+            r"$\frac{P(\alpha)}{P(\beta)}$", r"$\propto$",
+            "$\\begin{cases} \\frac{J_\\alpha\\cdot \\dot{R_\\alpha}}{J_\\beta\\cdot \\dot{R_\\beta}} & \\text{1D}\\\\ \\frac{J_\\alpha\\cdot {\\dot{R_\\alpha}}^2}{J_\\beta\\cdot {\\dot{R_\\beta}}^2} & \\text{2D}\\\\ \\frac{J_\\alpha\\cdot {\\dot{R_\\alpha}}^3}{J_\\beta\\cdot {\\dot{R_\\beta}}^3} & \\text{3D}\\end{cases}$",
+        ).scale(0.85).to_corner(UR)
+
+        self.play(
+            Write(observation)
+        )
+        self.wait()
 
 
 class FocusOn3D(Transform):
@@ -2127,6 +2433,3 @@ class TestMakeSenseOfTheseEquations(Scene):
             division_point_tracker.animate.set_value(-0.7)
         )
         self.wait()
-
-
-
