@@ -1191,8 +1191,8 @@ class TestCompetitivePhaseTransformation(ThreeDScene):
             Create(alpha_cone_1d_right)
         )
         self.wait()
-        # alpha_cone_1d_left.suspend_updating()
-        # alpha_cone_1d_right.suspend_updating()
+        alpha_cone_1d_left.suspend_updating()
+        alpha_cone_1d_right.suspend_updating()
 
         # add the plane
         plane = always_redraw(
@@ -1472,7 +1472,9 @@ class TestCompetitivePhaseTransformation(ThreeDScene):
         self.play(
             FadeOut(circ_overlap)
         )
+        circ_overlap.clear_updaters()
 
+        # SHOW THE 3D SPACETIME VERSION
         # move the time back to zero
         self.play(
             t_tracker.animate.set_value(0),
@@ -1481,22 +1483,350 @@ class TestCompetitivePhaseTransformation(ThreeDScene):
         )
         self.wait()
 
-        # SHOW THE 3D SPACETIME VERSION
+        # define the spheres
+        alpha_wins_sphere = always_redraw(
+            lambda:
+            Sphere(
+                center=axes.c2p(0, 0, t_tracker.get_value()),
+                radius=axes.c2p(
+                    (
+                            alpha_rate * (beta_t_tracker.get_value() + np.abs(beta_x_tracker.get_value() / beta_rate))
+                    ) - t_tracker.get_value() * alpha_rate,
+                    0, 0)[0],
+                stroke_width=1,
+            ).set_color(BLUE).set_opacity(0.5)
+        )
+
+        sphere_beta = always_redraw(
+            lambda:
+            Sphere(
+                center=axes.c2p(beta_x_tracker.get_value(), 0, t_tracker.get_value()),
+                radius=axes.c2p((t_tracker.get_value() - beta_cone_time) * beta_rate, 0, 0)[0],
+            ).set_color(GREEN_E).set_opacity(0.5)
+            if t_tracker.get_value() > beta_cone_time else Sphere(
+                center=axes.c2p(beta_x_tracker.get_value(), 0, t_tracker.get_value()),
+                radius=0,
+                stroke_opacity=0, fill_opacity=0
+            )
+        )
+
+        self.play(
+            Create(alpha_wins_sphere),
+            Create(sphere_beta)
+        )
+        self.play(
+            t_tracker.animate.set_value(
+                beta_t_tracker.get_value() + np.abs(beta_x_tracker.get_value() / beta_rate)
+            ),
+            run_time=2,
+            rate_func=linear
+        )
+        self.wait()
+
+        # fade out unused mobjects
+        self.play(
+            FadeOut(
+                plane, sphere_beta, alpha_wins_sphere,
+                alpha_wins_circle, circ_beta, alpha_win_cone, beta_cone,
+                alpha_wins_2d_with_intersect_1
+            )
+        )
+        self.wait()
+
+        # return to quasi-2D view
+        self.move_camera(
+            100 * DEGREES, -90 * DEGREES,
+            frame_center=np.array([0, 0, 0]),
+            added_anims=[
+                FadeOut(y_axis, y_label, alpha_cone_1d_left, alpha_cone_1d_right),
+                x_axis.animate.rotate(PI / 2, axis=X_AXIS),
+                x_label.animate.rotate(PI / 2, axis=X_AXIS)
+            ]
+        )
+        self.wait()
+
+        # ALPHA WINS WHEN BETA IN REGION 1
+        # move the beta cone position and time
+        self.play(
+            beta_x_tracker.animate.set_value(-1.1),
+            beta_t_tracker.animate.set_value(0.75)
+        )
+        self.wait()
+
+        # define the alpha win boundary
+        alpha_wins_1d_region_1 = Polygon(
+            axes.c2p(beta_x_tracker.get_value(), 0, beta_t_tracker.get_value()),
+            axes.c2p(beta_x_tracker.get_value() - alpha_rate * beta_t_tracker.get_value(), 0, 0),
+            axes.c2p(t_n * alpha_rate, 0, 0),
+            axes.c2p(0, 0, t_n),
+            axes.c2p(
+                beta_x_tracker.get_value() + beta_rate * (
+                        (alpha_rate * t_n - beta_rate * beta_t_tracker.get_value() - np.abs(
+                            beta_x_tracker.get_value())) / (
+                                alpha_rate - beta_rate
+                        ) - beta_t_tracker.get_value()
+                ),
+                0,
+                (alpha_rate * t_n - beta_rate * beta_t_tracker.get_value() - np.abs(beta_x_tracker.get_value())) / (
+                        alpha_rate - beta_rate
+                )
+            ),
+            color=BLUE, fill_opacity=0.7
+        )
+        self.play(
+            DrawBorderThenFill(alpha_wins_1d_region_1)
+        )
+        self.wait()
+
+        self.play(
+            FadeOut(alpha_wins_1d_region_1),
+            FadeOut(beta_cone_1d_left, beta_cone_1d_right)
+        )
+        self.wait()
+        beta_cone_1d_left.suspend_updating()
+        beta_cone_1d_right.suspend_updating()
+
+        # BETA WINS WHEN ALPHA IN REGION 2
+        # move the alpha cone into Region 2
+        alpha_x_tracker.set_value(-0.3)
+        alpha_t_tracker.set_value(0.8)
+        alpha_cone_1d_left.resume_updating()
+        alpha_cone_1d_right.resume_updating()
+        self.play(
+            Create(alpha_cone_1d_left),
+            Create(alpha_cone_1d_right)
+        )
+        self.wait()
+
+        # create the beta phase win polygon
+        beta_wins_1d_region_2 = always_redraw(
+            lambda:
+            Polygon(
+                axes.c2p(0, 0, alpha_t_tracker.get_value() + np.abs(alpha_x_tracker.get_value() / alpha_rate)),
+                axes.c2p(
+                    beta_rate * (alpha_t_tracker.get_value() + np.abs(alpha_x_tracker.get_value() / alpha_rate)),
+                    0, 0),
+                axes.c2p(
+                    alpha_x_tracker.get_value() - beta_rate * alpha_t_tracker.get_value(),
+                    0, 0),
+                axes.c2p(
+                    alpha_x_tracker.get_value(),
+                    0, alpha_t_tracker.get_value()),
+                color=BLUE, fill_opacity=0.7
+            )
+        )
+        self.play(
+            DrawBorderThenFill(beta_wins_1d_region_2)
+        )
+        self.wait()
+
+        # BETA WINS WHEN ALPHA IN REGION 1
+        # move the alpha cone into Region 1
+        self.play(
+            alpha_x_tracker.animate.set_value(-1.1),
+            run_time=2
+        )
+        self.wait()
+
+        # highlight the forbidden region
+        nothing_wins_region = Polygon(
+            axes.c2p(
+                alpha_x_tracker.get_value(),
+                0, alpha_t_tracker.get_value()),
+            axes.c2p(
+                alpha_x_tracker.get_value() - beta_rate * alpha_t_tracker.get_value(),
+                0, 0),
+            axes.c2p(-beta_rate * t_n, 0, 0),
+            axes.c2p(
+                alpha_x_tracker.get_value() + alpha_rate * (
+                        (alpha_rate * alpha_t_tracker.get_value() - beta_rate * t_n + np.abs(
+                            alpha_x_tracker.get_value())) / (
+                                alpha_rate - beta_rate
+                        ) - alpha_t_tracker.get_value()
+                ),
+                0,
+                (alpha_rate * alpha_t_tracker.get_value() - beta_rate * t_n + np.abs(alpha_x_tracker.get_value())) / (
+                        alpha_rate - beta_rate
+                )
+            ),
+            color=YELLOW_D, fill_opacity=0.4
+        )
+        self.play(
+            DrawBorderThenFill(nothing_wins_region)
+        )
+        self.wait()
+
+        # show the beta growth cone
+        beta_x_tracker.set_value(-0.95)
+        beta_t_tracker.set_value(0.7)
+
+        beta_cone_1d_left.resume_updating()
+        beta_cone_1d_right.resume_updating()
+        self.play(
+            Create(beta_cone_1d_left),
+            Create(beta_cone_1d_right)
+        )
+        self.wait()
 
 
+class TestTimeConeVolumeSummary(Scene):
+    def construct(self):
+        summary_table_1d_str = r"""
+        \begin{table}[h]
+    \centering
+    \begin{tabular}{|c|c|}
+        \hline
+        $||\Omega||$& 1D Space-time\\
+        \hline
+        $\alpha$ wins & $\frac{1}{6}{t_N}^2\left(5\dot{R_\alpha}-2\dot{R_\beta}\right)$\\
+        \hline
+        $\beta$ wins & $\frac{1}{6}{t_N}^2\frac{4\dot{R_\alpha}\dot{R_\beta}-{\dot{R_\beta}}^2}{\dot{R_\alpha}}$\\
+        \hline
+        Nothing wins&$\frac{1}{6}{t_N}^2\frac{\left(\dot{R_\alpha}-\dot{R_\beta}\right)^2}{\dot{R_\alpha}}$\\
+        \hline
+        Sum &$\dot{R_\alpha}{t_N}^2$\\
+        \hline
+    \end{tabular}
+\end{table}
+        """
+        summary_table_1d = Tex(summary_table_1d_str)
+        self.play(
+            Write(summary_table_1d)
+        )
+        self.wait()
+        self.play(
+            FadeOut(summary_table_1d)
+        )
+        self.wait()
 
+        summary_table_3d_str = r"""
+        \begin{table}[h]
+    \centering
+    \begin{tabular}{|c|c|}
+        \hline
+        $||\Omega||$& 3D Space-time\\
+        \hline
+        $\alpha$ wins & $\frac{\pi  {t_N}^4 \left(35 {\dot{R_\alpha}}^7+105 {\dot{R_\alpha}}^6 {\dot{R_\beta}}+105 {\dot{R_\alpha}}^5 {\dot{R_\beta}}^2+17 {\dot{R_\alpha}}^4
+   {\dot{R_\beta}}^3-54 {\dot{R_\alpha}}^3 {\dot{R_\beta}}^4-54 {\dot{R_\alpha}}^2 {\dot{R_\beta}}^5-8 {\dot{R_\alpha}} {\dot{R_\beta}}^6-6 {\dot{R_\beta}}^7\right)}{105 {\dot{R_\alpha}}
+   ({\dot{R_\alpha}}+{\dot{R_\beta}})^3}$ \\
+        \hline
+        $\beta$ wins & $\frac{\pi  {\dot{R_\beta}}^3 {t_N}^4 \left(2835 {\dot{R_\alpha}}^7-3780 {\dot{R_\alpha}}^6 {\dot{R_\beta}}+1890 {\dot{R_\alpha}}^5 {\dot{R_\beta}}^2-375
+   {\dot{R_\alpha}}^4 {\dot{R_\beta}}^3-65 {\dot{R_\alpha}}^3 {\dot{R_\beta}}^4+66 {\dot{R_\alpha}}^2 {\dot{R_\beta}}^5-12 {\dot{R_\alpha}} {\dot{R_\beta}}^6+{\dot{R_\beta}}^7\right)}{210 {\dot{R_\alpha}}^3
+   ({\dot{R_\beta}}-3 {\dot{R_\alpha}})^4}$\\
+        \hline
+        Nothing wins& $\frac{\pi  {\dot{R_\beta}}^3 {t_N}^4 ({\dot{R_\alpha}}-{\dot{R_\beta}})^3 \left(81 {\dot{R_\alpha}}^7+378 {\dot{R_\alpha}}^6 {\dot{R_\beta}}+864 {\dot{R_\alpha}}^5
+   {\dot{R_\beta}}^2-219 {\dot{R_\alpha}}^4 {\dot{R_\beta}}^3+245 {\dot{R_\alpha}}^3 {\dot{R_\beta}}^4-6 {\dot{R_\alpha}} {\dot{R_\beta}}^6+{\dot{R_\beta}}^7\right)}{210 {\dot{R_\alpha}}^3
+   ({\dot{R_\beta}}-3 {\dot{R_\alpha}})^4 ({\dot{R_\alpha}}+{\dot{R_\beta}})^3}$\\
+        \hline
+        Sum & $\frac{\pi}{3}{\dot{R_\alpha}}^3{t_N}^4$\\
+        \hline
+    \end{tabular}
+\end{table}
+        """
+        summary_table_3d = Tex(summary_table_3d_str, font_size=30)
+        self.play(
+            Write(summary_table_3d)
+        )
+        self.wait()
 
+        self.play(
+            FadeOut(summary_table_3d)
+        )
+        self.wait()
 
+        summary_table_2d_str = r"""
+                \begin{table}[h]
+            \centering
+            \begin{tabular}{|c|c|}
+                \hline
+                $||\Omega||$& 2D Space-time\\
+                \hline
+                $\alpha$ wins & $f(\dot{R_\alpha}, \dot{R_\beta}, t_N)$ \\
+                \hline
+                $\beta$ wins & $f(\dot{R_\alpha}, \dot{R_\beta}, t_N)$\\
+                \hline
+                Nothing wins& $f(\dot{R_\alpha}, \dot{R_\beta}, t_N)$\\
+                \hline
+                Sum & $\frac{\pi}{3}{\dot{R_\alpha}}^2{t_N}^3$\\
+                \hline
+            \end{tabular}
+        \end{table}
+                """
+        summary_table_2d = Tex(summary_table_2d_str, font_size=40)
+        self.play(
+            Write(summary_table_2d)
+        )
+        self.wait()
 
-        # # return to quasi-2D view
-        # self.move_camera(
-        #     100 * DEGREES, -90 * DEGREES,
-        #     frame_center=np.array([0, 0, 0]),
-        #     added_anims=[
-        #         FadeIn(z_axis, z_label),
-        #         FadeOut(y_axis, y_label),
-        #         x_axis.animate.rotate(PI / 2, axis=X_AXIS),
-        #         x_label.animate.rotate(PI / 2, axis=X_AXIS),
-        #     ]
-        # )
-        # self.wait()
+        self.play(
+            summary_table_2d.animate.shift(LEFT * 3)
+        )
+        self.wait()
+
+        # ADD THE CIRCLES
+        circ_left = Circle(radius=1.5, color=ORANGE).shift(RIGHT * 2.5)
+        circ_right = Circle(radius=1, color=GREEN).shift(RIGHT * 4.5)
+        self.play(
+            GrowFromCenter(circ_left),
+            GrowFromCenter(circ_right)
+        )
+        self.wait()
+
+        # add the lines
+        circ_left_radius = DashedLine(
+            start=circ_left.get_center(),
+            end=circ_left.get_top()
+        )
+        circ_left_radius_label = BraceLabel(
+            circ_left_radius, "R",
+            brace_direction=LEFT
+        )
+        circ_right_radius = DashedLine(
+            start=circ_right.get_center(),
+            end=circ_right.get_top()
+        )
+        circ_right_radius_label = BraceLabel(
+            circ_right_radius, "r",
+            brace_direction=RIGHT
+        )
+        self.play(
+            Create(circ_left_radius),
+            Create(circ_right_radius),
+            run_time=0.5,
+            rate_func=smooth
+        )
+        self.play(
+            Write(circ_left_radius_label),
+            Write(circ_right_radius_label)
+        )
+        self.wait()
+
+        # add the distance in between
+        circ_distance = DashedLine(
+            start=circ_left.get_center(),
+            end=circ_right.get_center()
+        )
+        circ_distance_label = BraceLabel(
+            circ_distance, "d"
+        )
+        self.play(
+            Create(circ_distance),
+            run_time=0.5,
+            rate_func=smooth
+        )
+        self.play(
+            Write(circ_distance_label)
+        )
+        self.wait()
+
+        circ_overlap_formula = Tex(
+            "$r^2 \\cos ^{-1}\\left(\\frac{d^2+r^2-R^2}{2 d r}\\right)+$",
+            "$R^2 \\cos ^{-1}\\left(\\frac{d^2-r^2+R^2}{2 d R}\\right)-$",
+            "$\\frac{1}{2} \\sqrt{(d+r-R) (d-r+R) (-d+r+R) (d+r+R)}$",
+            font_size=30
+        ).shift(DOWN * 2.5)
+        self.play(
+            Write(circ_overlap_formula)
+        )
+        self.wait()
+
