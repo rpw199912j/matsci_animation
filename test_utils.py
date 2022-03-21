@@ -118,6 +118,39 @@ class TestParametricSurface(ThreeDScene):
         )
         self.wait()
 
+        # add the example point
+        example_point = Dot(
+            point=axes_3d.c2p(2, 2)
+        )
+        example_point_vline = DashedLine(
+            start=axes_3d.c2p(2, 2),
+            end=axes_3d.c2p(2, 0)
+        )
+        example_point_hline = DashedLine(
+            start=axes_3d.c2p(2, 2),
+            end=axes_3d.c2p(0, 2)
+        )
+        example_point_label = Tex(
+            r"$\frac{P(\alpha)}{P(\beta)}$"
+        ).move_to(axes_3d.c2p(2.5, 2.5, 0))
+
+        self.play(
+            FadeIn(example_point)
+        )
+        self.play(
+            Create(example_point_vline),
+            Create(example_point_hline)
+        )
+        self.play(
+            Write(example_point_label)
+        )
+        self.wait()
+
+        self.play(
+            FadeOut(example_point, example_point_vline, example_point_hline, example_point_label)
+        )
+        self.wait()
+
         # create the dots
         sampling_number = 100
         sampling_unit_increment = x_max / sampling_number
@@ -1829,4 +1862,271 @@ class TestTimeConeVolumeSummary(Scene):
             Write(circ_overlap_formula)
         )
         self.wait()
+
+
+class TestMakeSenseOfTheseEquations(Scene):
+    def construct(self):
+        question = Tex(
+            "How can we make sense of those formulas?", font_size=50
+        )
+
+        self.play(Write(question), run_time=0.5)
+        self.wait()
+
+        self.play(
+            question.animate.scale(0.6).to_corner(UL)
+        )
+        self.wait()
+
+        num_line = NumberLine(x_range=[0, 1], length=10)
+        self.play(
+            Create(num_line)
+        )
+        self.wait()
+
+        sep_tick_1_tracker = ValueTracker(0.2)
+        sep_tick_2_tracker = ValueTracker(0.6)
+        p_nothing = always_redraw(
+            lambda:
+            VGroup(
+                Line(
+                    start=np.array([0, 0.1, 0]),
+                    end=np.array([0, -0.1, 0]),
+                    stroke_width=2
+                ).move_to(num_line.n2p(sep_tick_1_tracker.get_value())),
+                Line(
+                    start=np.array([0, 0.1, 0]),
+                    end=np.array([0, -0.1, 0]),
+                    stroke_width=2
+                ).move_to(num_line.n2p(0)).set_opacity(0)
+            )
+        )
+
+        p_alpha = always_redraw(
+            lambda:
+            VGroup(
+                Line(
+                    start=np.array([0, 0.1, 0]),
+                    end=np.array([0, -0.1, 0]),
+                    stroke_width=2
+                ).move_to(num_line.n2p(sep_tick_1_tracker.get_value())),
+                Line(
+                    start=np.array([0, 0.1, 0]),
+                    end=np.array([0, -0.1, 0]),
+                    stroke_width=2
+                ).move_to(num_line.n2p(sep_tick_2_tracker.get_value()))
+            )
+        )
+        p_beta = always_redraw(
+            lambda:
+            VGroup(
+                Line(
+                    start=np.array([0, 0.1, 0]),
+                    end=np.array([0, -0.1, 0]),
+                    stroke_width=2
+                ).move_to(num_line.n2p(sep_tick_2_tracker.get_value())),
+                Line(
+                    start=np.array([0, 0.1, 0]),
+                    end=np.array([0, -0.1, 0]),
+                    stroke_width=2
+                ).move_to(num_line.n2p(1))
+            )
+        )
+
+        p_nothing_label = always_redraw(
+            lambda:
+            BraceLabel(p_nothing, "P(\\text{nothing})", brace_direction=UP)
+        )
+        p_alpha_label = always_redraw(
+            lambda:
+            BraceLabel(p_alpha, "P(\\alpha)", brace_direction=UP)
+        )
+        p_beta_label = always_redraw(
+            lambda:
+            BraceLabel(p_beta, "P(\\beta)", brace_direction=UP)
+        )
+        p_tot_label = BraceLabel(num_line, "1")
+
+        self.play(
+            Create(p_nothing), run_time=0.5
+        )
+        self.play(
+            Write(p_nothing_label)
+        )
+        self.play(
+            Create(p_alpha), run_time=0.5
+        )
+        self.play(
+            Write(p_alpha_label)
+        )
+        self.play(
+            Create(p_beta), run_time=0.5
+        )
+        self.play(
+            Write(p_beta_label)
+        )
+        self.wait()
+        self.play(
+            Write(p_tot_label), run_time=0.5
+        )
+        self.wait()
+        self.play(
+            Unwrite(p_tot_label), run_time=0.5
+        )
+        self.wait()
+
+        self.play(
+            sep_tick_2_tracker.animate.set_value(0.8)
+        )
+        self.wait()
+        self.play(
+            sep_tick_2_tracker.animate.set_value(0.4)
+        )
+        self.wait()
+
+        self.play(
+            num_line.animate.shift(UP)
+        )
+        self.wait()
+
+        # write out the proposition
+        proposition_3 = Tex(
+            r"$\frac{P(\alpha)}{P(\beta)}=\frac{\text{\# $\alpha$ nuc. events in $||\Omega_\alpha||$}}{\text{\# $\beta$ nuc. events in $||\Omega_\beta||$}}$",
+            r" $=\frac{J_\alpha\cdot ||\Omega_\alpha||}{J_\beta\cdot ||\Omega_\beta||}$",
+            r" $\propto\frac{J_\alpha\cdot{\dot{R_\alpha}}^n}{J_\beta\cdot{\dot{R_\beta}}^n}$"
+        )
+        proposition_2 = Tex(
+            r"$\frac{P(\alpha)}{P(\beta)}=\frac{\text{\# $\alpha$ nuc. events in $||\Omega_\alpha||$}}{\text{\# $\beta$ nuc. events in $||\Omega_\beta||$}}$",
+            r" $=\frac{J_\alpha\cdot ||\Omega_\alpha||}{J_\beta\cdot ||\Omega_\beta||}$"
+        ).align_to(proposition_3, direction=LEFT)
+        proposition_1 = Tex(
+            r"$\frac{P(\alpha)}{P(\beta)}=\frac{\text{\# $\alpha$ nuc. events in $||\Omega_\alpha||$}}{\text{\# $\beta$ nuc. events in $||\Omega_\beta||$}}$"
+        ).align_to(proposition_3, direction=LEFT)
+        self.play(
+            Write(proposition_1)
+        )
+        self.wait()
+        self.play(
+            TransformMatchingTex(proposition_1, proposition_2)
+        )
+        self.wait()
+        self.play(
+            TransformMatchingTex(proposition_2, proposition_3)
+        )
+        self.wait()
+
+        # add the time cone visualization
+
+        axes = Axes(
+            x_range=[-3, 3],
+            y_range=[0, 4],
+            x_length=6,
+            y_length=4
+        ).shift(DOWN * 2).scale(0.7)
+
+        self.play(
+            Create(axes)
+        )
+        self.wait()
+
+        dot = Dot(
+            point=axes.c2p(0, 3)
+        )
+        time_cone_left = DashedLine(
+            start=axes.c2p(0, 3),
+            end=axes.c2p(-2, 0)
+        )
+        time_cone_right = DashedLine(
+            start=axes.c2p(0, 3),
+            end=axes.c2p(2, 0)
+        )
+
+        division_point_tracker = ValueTracker(0)
+
+        self.play(
+            Create(dot)
+        )
+        self.play(
+            Create(time_cone_left),
+            Create(time_cone_right)
+        )
+        self.wait()
+
+        # get the division of the time cone
+        alpha_wins_portion = always_redraw(
+            lambda:
+            Polygon(
+                axes.c2p(0, 3),
+                axes.c2p(2, 0),
+                axes.c2p(division_point_tracker.get_value(), 0),
+                color=ORANGE, fill_opacity=0.7
+            )
+        )
+        beta_wins_portion = always_redraw(
+            lambda:
+            Polygon(
+                axes.c2p(0, 3),
+                axes.c2p(-2, 0),
+                axes.c2p(division_point_tracker.get_value(), 0),
+                color=GREEN, fill_opacity=0.7
+            )
+        )
+        self.play(
+            DrawBorderThenFill(alpha_wins_portion)
+        )
+        self.wait()
+        self.play(
+            DrawBorderThenFill(beta_wins_portion)
+        )
+        self.wait()
+
+        alpha_points = [
+            Dot(point=axes.c2p(1, 1), color=ORANGE),
+            Dot(point=axes.c2p(1.7, 0.2), color=ORANGE),
+            Dot(point=axes.c2p(0.5, 0.6), color=ORANGE),
+            Dot(point=axes.c2p(0.2, 2), color=ORANGE)
+        ]
+        beta_points = [
+            Dot(point=axes.c2p(-1, 1), color=GREEN),
+            Dot(point=axes.c2p(-0.6, 0.5), color=GREEN),
+        ]
+
+        self.play(
+            LaggedStart(
+                *[
+                    FadeIn(point) for point in alpha_points[:2]
+                ],
+                lag_ratio=0.4,
+                run_time=0.5
+            ),
+            LaggedStart(
+                *[
+                    FadeIn(point) for point in beta_points[:2]
+                ],
+                lag_ratio=0.4,
+                run_time=0.5
+            )
+        )
+        self.wait()
+
+        self.play(
+            LaggedStart(
+                *[
+                    FadeIn(point) for point in alpha_points[2:]
+                ],
+                lag_ratio=0.4,
+                run_time=0.25
+            )
+        )
+        self.wait()
+
+        self.play(
+            division_point_tracker.animate.set_value(0.5)
+        )
+        self.play(
+            division_point_tracker.animate.set_value(-0.7)
+        )
+        self.wait()
+
+
 
