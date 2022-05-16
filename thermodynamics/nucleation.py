@@ -15,6 +15,9 @@ class CriticalRadius(Scene):
             tips=False
         )
 
+        # get the unit y length
+        unit_y_length = (axes.c2p(0, 1) - axes.c2p(0, 0))[1]
+
         x_label = axes.get_x_axis_label(Tex("$r$"))
         y_label = axes.get_y_axis_label(Tex("$\Delta G$"))
 
@@ -23,7 +26,9 @@ class CriticalRadius(Scene):
         delta_G = -0.18
         interfacial_energy = 0.054
         r_crit = 2 * interfacial_energy / np.abs(delta_G)
-        y_shift = 0.035
+        dot_radius = 0.3
+        y_shift = dot_radius / (unit_y_length * 2.86)
+        print(unit_y_length)
 
         # define the volume Gibbs free energy term
         volume_G = axes.plot(
@@ -44,17 +49,6 @@ class CriticalRadius(Scene):
             lambda r:
             4 / 3 * np.pi * r ** 3 * delta_G + 4 * np.pi * r ** 2 * interfacial_energy,
             x_range=(0, x_max), color=YELLOW
-        )
-
-        total_G_shifted_left = axes.plot(
-            lambda r:
-            4 / 3 * np.pi * r ** 3 * delta_G + 4 * np.pi * r ** 2 * interfacial_energy + y_shift,
-            x_range=(0, r_crit)
-        )
-        total_G_shifted_right = axes.plot(
-            lambda r:
-            4 / 3 * np.pi * r ** 3 * delta_G + 4 * np.pi * r ** 2 * interfacial_energy + y_shift,
-            x_range=(r_crit, x_max)
         )
 
         self.play(
@@ -119,34 +113,39 @@ class CriticalRadius(Scene):
         self.wait()
 
         # add a circle
-        dot = Dot(
-            point=total_G_shifted_left.get_end()
+        dot_x_tracker = ValueTracker(r_crit)
+        dot = always_redraw(
+            lambda:
+            Dot(
+                point=axes.c2p(
+                    dot_x_tracker.get_value(),
+                    4 / 3 * np.pi * dot_x_tracker.get_value() ** 3 * delta_G + (
+                            4 * np.pi * dot_x_tracker.get_value() ** 2 * interfacial_energy +
+                            dot_x_tracker.get_value() / (unit_y_length * 2.84)
+                    ),
+                ),
+                radius=dot_x_tracker.get_value() / unit_y_length
+            )
         )
         self.play(
             DrawBorderThenFill(dot)
         )
         self.wait()
 
-        total_G_shifted_left.reverse_points()
-        # self.add(total_G_shifted_left)
-
         self.play(
-            MoveAlongPath(dot, total_G_shifted_left),
+            dot_x_tracker.animate.set_value(0),
             run_time=2
         )
         self.wait()
 
-        total_G_shifted_left.reverse_points()
         self.play(
-            MoveAlongPath(dot, total_G_shifted_left),
+            dot_x_tracker.animate.set_value(r_crit),
             run_time=2
         )
         self.wait()
 
-        # self.add(total_G_shifted_right)
         self.play(
-            MoveAlongPath(dot, total_G_shifted_right),
+            dot_x_tracker.animate.set_value(x_max),
             run_time=2
         )
         self.wait()
-
