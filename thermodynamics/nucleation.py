@@ -23,12 +23,10 @@ class CriticalRadius(Scene):
 
         # define the variables
         num_of_lines = 100
-        delta_G = -0.18
-        interfacial_energy = 0.054
+        delta_G = -0.44
+        interfacial_energy = 0.16
         r_crit = 2 * interfacial_energy / np.abs(delta_G)
-        dot_radius = 0.3
-        y_shift = dot_radius / (unit_y_length * 2.86)
-        print(unit_y_length)
+        delta_G_crit = 4 / 3 * np.pi * r_crit ** 3 * delta_G + 4 * np.pi * r_crit ** 2 * interfacial_energy
 
         # define the volume Gibbs free energy term
         volume_G = axes.plot(
@@ -49,6 +47,11 @@ class CriticalRadius(Scene):
             lambda r:
             4 / 3 * np.pi * r ** 3 * delta_G + 4 * np.pi * r ** 2 * interfacial_energy,
             x_range=(0, x_max), color=YELLOW
+        )
+        total_G_crit = axes.plot(
+            lambda r:
+            4 / 3 * np.pi * r ** 3 * delta_G + 4 * np.pi * r ** 2 * interfacial_energy,
+            x_range=(0, r_crit), color=YELLOW
         )
 
         self.play(
@@ -109,6 +112,71 @@ class CriticalRadius(Scene):
         # remove the surface_G, volume_G and vertical lines
         self.play(
             FadeOut(surface_G, volume_G, *volume_G_lines)
+        )
+        self.wait()
+
+        # add a tangent line
+        tangent_frac_tracker = ValueTracker(0)
+        tangent = always_redraw(
+            lambda:
+            TangentLine(
+                total_G, alpha=tangent_frac_tracker.get_value(),
+                color=PURPLE_C, length=2, stroke_width=7
+            )
+        )
+
+        self.play(
+            Create(tangent)
+        )
+        self.wait()
+
+        self.play(
+            tangent_frac_tracker.animate.set_value(1),
+            run_time=2
+        )
+        self.wait()
+
+        self.play(
+            tangent_frac_tracker.animate.set_value(
+                total_G_crit.get_arc_length() / total_G.get_arc_length()
+            )
+        )
+        self.wait()
+
+        self.play(
+            FadeOut(tangent), run_time=0.5
+        )
+        self.wait()
+
+        # highlight the r_crit and G_crit
+        lines_crit_1 = DashedLine(
+            start=axes.c2p(r_crit, delta_G_crit),
+            end=axes.c2p(0, delta_G_crit)
+        )
+
+        lines_crit_2 = DashedLine(
+            start=axes.c2p(r_crit, delta_G_crit),
+            end=axes.c2p(r_crit, 0)
+        )
+
+        self.play(
+            Create(lines_crit_1),
+            Create(lines_crit_2)
+        )
+        self.wait()
+
+        # add the critical radius and Delta G label
+        delta_G_crit_label = Tex(
+            r"$\Delta G^*$"
+        ).next_to(lines_crit_1.get_left(), direction=LEFT, buff=0.1)
+
+        r_crit_label = Tex(
+            r"$r^*$"
+        ).next_to(lines_crit_2.get_bottom(), direction=DOWN, buff=0.1)
+
+        self.play(
+            Write(r_crit_label),
+            Write(delta_G_crit_label)
         )
         self.wait()
 
