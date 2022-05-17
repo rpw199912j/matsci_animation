@@ -339,16 +339,61 @@ class ChangeVariables(Scene):
         )
         self.wait()
 
+        # write out the total delta G expression
+        total_G_eq = MathTex(
+            r"\Delta G", "&=",
+            r"\frac{4}{3}\pi r^3\left(G_\beta-G_\alpha\right)\\",
+            "&+",
+            r"4\pi r^2\gamma"
+        ).to_corner(UR)
+
+        total_G_eq[0].set_color(YELLOW)
+        total_G_eq[2].set_color(RED)
+        total_G_eq[4].set_color(GREEN)
+
+        bounding_box_1 = SurroundingRectangle(
+            total_G_eq[2][6:], color=BLUE
+        )
+        arrow_1 = Arrow(
+            start=bounding_box_1.get_corner(UR) + 0.2 * UP,
+            end=bounding_box_1.get_corner(DR) + 0.2 * DOWN
+        ).next_to(bounding_box_1, direction=RIGHT, buff=0.5 * DEFAULT_MOBJECT_TO_MOBJECT_BUFFER)
+
+        bounding_box_2 = SurroundingRectangle(
+            total_G_eq[4][4:], color=BLUE
+        )
+        arrow_2 = Arrow(
+            start=bounding_box_2.get_corner(DR) + 0.2 * DOWN,
+            end=bounding_box_2.get_corner(UR) + 0.2 * UP
+        ).next_to(bounding_box_2, direction=RIGHT, buff=0.5 * DEFAULT_MOBJECT_TO_MOBJECT_BUFFER)
+
+        self.play(Write(total_G_eq))
+        self.wait()
+
+        self.play(Create(bounding_box_1))
+        self.wait()
+
         # increase the magnitude of delta_G
         self.play(
-            delta_G_tracker.animate.set_value(-0.7),
-            run_time=2
+            FadeIn(arrow_1, run_time=0.5),
+            delta_G_tracker.animate(run_time=2).set_value(-0.7),
+        )
+        self.play(
+            FadeOut(arrow_1, run_time=0.5)
         )
         self.wait()
 
         # increase the magnitude of interfacial_energy
         self.play(
-            interfacial_energy_tracker.animate.set_value(0.25),
-            run_time=2
+            Transform(bounding_box_1, bounding_box_2)
+        )
+        self.wait()
+
+        self.play(
+            FadeIn(arrow_2, run_time=0.5),
+            interfacial_energy_tracker.animate(run_time=2).set_value(0.25)
+        )
+        self.play(
+            FadeOut(arrow_2, run_time=0.5)
         )
         self.wait()
