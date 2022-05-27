@@ -425,3 +425,186 @@ class ChangeVariables(Scene):
             FadeOut(arrow_2, run_time=0.5)
         )
         self.wait()
+
+
+class MathDerivation(Scene):
+    def construct(self):
+        # define the plotting axes
+        x_max = 1.2
+        y_max = 1
+        axes = Axes(
+            x_range=[0, x_max, 0.2],
+            y_range=[-y_max, y_max, 0.5],
+            x_length=8,
+            y_length=6,
+            tips=False
+        )
+
+        # get the unit y length
+        unit_y_length = (axes.c2p(0, 1) - axes.c2p(0, 0))[1]
+
+        x_label = axes.get_x_axis_label(Tex("$r$"))
+        y_label = axes.get_y_axis_label(Tex("$\Delta G$"))
+
+        # define the variables
+        num_of_lines = 100
+        delta_G = -0.44
+        interfacial_energy = 0.16
+        r_crit = 2 * interfacial_energy / np.abs(delta_G)
+        delta_G_crit = 4 / 3 * np.pi * r_crit ** 3 * delta_G + 4 * np.pi * r_crit ** 2 * interfacial_energy
+
+        # define the total energy
+        total_G = axes.plot(
+            lambda r:
+            4 / 3 * np.pi * r ** 3 * delta_G + 4 * np.pi * r ** 2 * interfacial_energy,
+            x_range=(0, x_max), color=YELLOW
+        )
+        total_G_label = MathTex(
+            r"\Delta G_{\text{tot}}",
+            color=YELLOW
+        ).move_to(
+            axes.c2p(1, -0.25)
+        )
+
+        total_G_crit = axes.plot(
+            lambda r:
+            4 / 3 * np.pi * r ** 3 * delta_G + 4 * np.pi * r ** 2 * interfacial_energy,
+            x_range=(0, r_crit), color=YELLOW
+        )
+
+        # define the derivative of total energy wrt r
+        total_G_deriv = axes.plot_derivative_graph(
+            total_G, color=BLUE
+        )
+
+        total_G_deriv_label = MathTex(
+            r"\frac{\partial}{\partial r}\left(\Delta G_{\text{tot}}\right)",
+            color=BLUE
+        ).move_to(
+            axes.c2p(0.6, -0.5)
+        )
+
+        self.add(
+            axes, x_label, y_label, total_G, total_G_label
+        )
+        self.wait()
+
+        self.play(
+            Create(total_G_deriv)
+        )
+        self.play(
+            Write(total_G_deriv_label)
+        )
+        self.wait()
+
+        # highlight the point where derivative is equal to 0
+        deriv_0 = Dot(
+            point=axes.c2p(r_crit, 0), color=PURPLE
+        )
+        self.play(
+            LaggedStart(
+                DrawBorderThenFill(deriv_0),
+                Flash(deriv_0),
+                lag_ratio=0.5
+            )
+
+        )
+        self.wait()
+
+        # shift everything to the left
+        self.play(
+            *[mob.animate.shift(LEFT * 2.5) for mob in self.mobjects]
+        )
+        self.wait()
+
+        # write out the equations
+        total_G_eq = MathTex(
+            r"\Delta G", "&=",
+            r"\frac{4}{3}", r"\pi", "r^3", r"\left(G_\beta-G_\alpha\right)\\",
+            "&+",
+            "4", r"\pi", "r^2", r"\gamma"
+        ).to_corner(UR)
+
+        total_G_deriv_eq_1 = MathTex(
+            r"\frac{\partial}{\partial r}", r"\left(", r"\Delta G", r"\right)", "&=",
+            "4", r"\pi", "r^2", r"\left(G_\beta-G_\alpha\right)\\",
+            "&+",
+            "8", r"\pi", "r", r"\gamma"
+        ).to_corner(UR)
+
+        total_G_deriv_eq_2 = MathTex(
+            "0", "&=",
+            "4", r"\pi", "r^2", r"\left(G_\beta-G_\alpha\right)\\",
+            "&+",
+            "8", r"\pi", "r", r"\gamma"
+        ).to_corner(UR).align_to(
+            total_G_deriv_eq_1, UP
+        )
+
+        total_G_deriv_eq_3 = MathTex(
+            "-", "8", r"\pi", "r", r"\gamma", "&=",
+            "4", r"\pi", "r^2", r"\left(G_\beta-G_\alpha\right)\\",
+        ).to_corner(UR).align_to(
+            total_G_deriv_eq_2, UP
+        )
+
+        total_G_deriv_eq_4 = MathTex(
+            "-", "8", r"\pi", "r", r"\gamma", "&=",
+            "4", r"\pi", "r^2", r"\left(G_\beta-G_\alpha\right)\\",
+            r"\frac{-8\pi r \gamma}{4\pi r^2}", "&=", r"\left(G_\beta-G_\alpha\right)\\"
+        ).to_corner(UR).align_to(
+            total_G_deriv_eq_3, UP
+        )
+
+        total_G_deriv_eq_5 = MathTex(
+            "-", "8", r"\pi", "r", r"\gamma", "&=",
+            "4", r"\pi", "r^2", r"\left(G_\beta-G_\alpha\right)\\",
+            r"\frac{-2 \gamma}{r}", "&=", r"\left(G_\beta-G_\alpha\right)\\"
+        ).to_corner(UR).align_to(
+            total_G_deriv_eq_3, UP
+        )
+
+        total_G_deriv_eq_6 = MathTex(
+            "-", "8", r"\pi", "r", r"\gamma", "&=",
+            "4", r"\pi", "r^2", r"\left(G_\beta-G_\alpha\right)\\",
+            r"\frac{-2 \gamma}{r}", "&=", r"\left(G_\beta-G_\alpha\right)\\",
+            "r^*", "&=", r"\frac{-2 \gamma}{G_\beta-G_\alpha}"
+        ).to_corner(UR).align_to(
+            total_G_deriv_eq_3, UP
+        )
+
+        self.play(
+            Write(total_G_eq)
+        )
+        self.wait()
+
+        self.play(
+            TransformMatchingTex(total_G_eq, total_G_deriv_eq_1)
+        )
+        self.wait()
+
+        self.play(
+            TransformMatchingTex(total_G_deriv_eq_1, total_G_deriv_eq_2)
+        )
+        self.wait()
+
+        self.play(
+            TransformMatchingTex(total_G_deriv_eq_2, total_G_deriv_eq_3)
+        )
+        self.wait()
+
+        self.play(
+            Write(total_G_deriv_eq_4[-3:])
+        )
+        self.wait()
+
+        self.play(
+            TransformMatchingShapes(total_G_deriv_eq_4[-3:], total_G_deriv_eq_5[-3:])
+        )
+        self.wait()
+
+        self.play(
+            Write(total_G_deriv_eq_6[-3:])
+        )
+        self.wait()
+
