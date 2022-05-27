@@ -34,12 +34,24 @@ class CriticalRadius(Scene):
             4 / 3 * np.pi * r ** 3 * delta_G,
             x_range=(0, x_max), color=RED
         )
+        volume_G_label = MathTex(
+            r"\Delta G_{\text{vol}}",
+            color=RED
+        ).move_to(
+            axes.c2p(0.4, -0.5)
+        )
 
         # define the surface Gibbs free energy term
         surface_G = axes.plot(
             lambda r:
             4 * np.pi * r ** 2 * interfacial_energy,
             x_range=(0, x_max), color=GREEN
+        )
+        surface_G_label = MathTex(
+            r"\Delta G_{\text{sur}}",
+            color=GREEN
+        ).move_to(
+            axes.c2p(0.35, 0.5)
         )
 
         # define the total energy
@@ -48,6 +60,13 @@ class CriticalRadius(Scene):
             4 / 3 * np.pi * r ** 3 * delta_G + 4 * np.pi * r ** 2 * interfacial_energy,
             x_range=(0, x_max), color=YELLOW
         )
+        total_G_label = MathTex(
+            r"\Delta G_{\text{tot}}",
+            color=YELLOW
+        ).move_to(
+            axes.c2p(1, -0.25)
+        )
+
         total_G_crit = axes.plot(
             lambda r:
             4 / 3 * np.pi * r ** 3 * delta_G + 4 * np.pi * r ** 2 * interfacial_energy,
@@ -66,10 +85,16 @@ class CriticalRadius(Scene):
         self.play(
             Create(volume_G)
         )
+        self.play(
+            Write(volume_G_label)
+        )
         self.wait()
 
         self.play(
             Create(surface_G)
+        )
+        self.play(
+            Write(surface_G_label)
         )
         self.wait()
 
@@ -107,11 +132,14 @@ class CriticalRadius(Scene):
         self.play(
             TransformFromCopy(surface_G, total_G)
         )
+        self.play(
+            Write(total_G_label)
+        )
         self.wait()
 
         # remove the surface_G, volume_G and vertical lines
         self.play(
-            FadeOut(surface_G, volume_G, *volume_G_lines)
+            FadeOut(surface_G, volume_G, *volume_G_lines, surface_G_label, volume_G_label)
         )
         self.wait()
 
