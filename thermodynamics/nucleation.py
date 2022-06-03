@@ -1,5 +1,7 @@
 import numpy as np
+import pandas as pd
 from manim import *
+from scipy import interpolate
 
 
 class CriticalRadius(Scene):
@@ -608,3 +610,201 @@ class MathDerivation(Scene):
         )
         self.wait()
 
+
+class CrossOver(ZoomedScene):
+    def __init__(self):
+        ZoomedScene.__init__(
+            self,
+            zoomed_display_width=5,
+            zoomed_display_height=3
+        )
+
+    def construct(self):
+        # define the axes
+        x_min, x_max, x_step = 990, 1030, 5
+        y_min, y_max, y_step = -46500, -43000, 500
+        axes = Axes(
+            x_range=[x_min, x_max, x_step],
+            y_range=[y_min, y_max, y_step],
+            x_length=8,
+            y_length=6,
+            tips=False
+        )
+
+        # add the axes labels
+        x_label = axes.get_x_axis_label(Tex("$T$"))
+        y_label = axes.get_y_axis_label(Tex("$G$"), edge=LEFT, direction=LEFT)
+
+        self.add(axes)
+        self.wait()
+
+        self.play(
+            Write(x_label),
+            Write(y_label)
+        )
+        self.wait()
+
+        # add the thermo-calc logo
+        thermocalc_logo = SVGMobject(
+            r"C:\Users\rpw19\PycharmProjects\matsci_animation\figure\ThermoCalc_logo.svg"
+        ).set(height=config["frame_height"] * 0.15).set_color("#9b193b").to_corner(UL)
+        self.play(
+            DrawBorderThenFill(thermocalc_logo)
+        )
+        self.wait()
+
+        # read in the gibbs energy data
+        gibbs_df = pd.read_csv(
+            r"C:\Users\rpw19\PycharmProjects\matsci_animation\data\gibbs_energy\gibbs_energy_per_mole.csv",
+            names=["temp", "bcc", "fcc"]
+        ).drop(index=0)
+        gibbs_df = gibbs_df.astype(float)
+        gibbs_df = gibbs_df[gibbs_df["temp"].between(x_min, x_max)]
+        bcc_gibbs = gibbs_df[["temp", "bcc"]].to_numpy()
+        fcc_gibbs = gibbs_df[["temp", "fcc"]].to_numpy()
+
+        # fit a spline curve for bcc
+        bcc_fit = interpolate.interp1d(
+            bcc_gibbs[:, 0],
+            bcc_gibbs[:, 1]
+        )
+
+        bcc_curve = axes.plot(
+            lambda x: bcc_fit(x),
+            x_range=[x_min, x_max],
+            color=GREEN, stroke_width=2
+        )
+
+        # fit a spline curve for fcc
+        fcc_fit = interpolate.interp1d(
+            fcc_gibbs[:, 0],
+            fcc_gibbs[:, 1]
+        )
+
+        fcc_curve = axes.plot(
+            lambda x: fcc_fit(x),
+            x_range=[x_min, x_max],
+            color=RED, stroke_width=2
+        )
+
+        # find the intersection points
+        intersect_x_lst = np.linspace(x_min, x_max, num=10000)
+        bcc_y_lst = bcc_fit(intersect_x_lst)
+        fcc_y_lst = fcc_fit(intersect_x_lst)
+        intersect_x_idx = np.argmin(np.abs(bcc_y_lst - fcc_y_lst))
+        intersect_x = intersect_x_lst[intersect_x_idx]
+
+        # bcc_curve = axes.plot_line_graph(
+        #     x_values=bcc_gibbs[:, 0],
+        #     y_values=bcc_gibbs[:, 1],
+        #     add_vertex_dots=False,
+        #     line_color=GREEN,
+        #     stroke_width=2
+        # )
+        # fcc_curve = axes.plot_line_graph(
+        #     x_values=fcc_gibbs[:, 0],
+        #     y_values=fcc_gibbs[:, 1],
+        #     add_vertex_dots=False,
+        #     line_color=RED,
+        #     stroke_width=2
+        # )
+
+        self.play(
+            Create(bcc_curve)
+        )
+        self.play(
+            Create(fcc_curve)
+        )
+
+        # add the zoomed frame
+        zoomed_camera = self.zoomed_camera
+        zoomed_display = self.zoomed_display
+        zoomed_camera_frame = zoomed_camera.frame
+        zoomed_display_frame = zoomed_display.display_frame
+
+        zoomed_camera_frame.set_color(YELLOW)
+        zoomed_display_frame.set_color(YELLOW)
+
+        # add the moving dots
+        x_tracker = ValueTracker(x_min)
+        bcc_dot = always_redraw(
+            lambda:
+            Dot(
+                point=axes.i2gp(x_tracker.get_value(), bcc_curve),
+                radius=0.03, color=GREEN
+            )
+        )
+        fcc_dot = always_redraw(
+            lambda:
+            Dot(
+                point=axes.i2gp(x_tracker.get_value(), fcc_curve),
+                radius=0.03, color=RED
+            )
+        )
+
+        zoomed_camera_frame.add_updater(
+            lambda x: x.move_to(
+                (bcc_dot.get_center() + fcc_dot.get_center()) / 2
+            )
+        )
+
+        # add the G_beta - G_alpha labels
+        delta_gibbs_label = MathTex(
+            r"G_\beta", "-", r"G_\alpha", "="
+        ).move_to(
+            axes.c2p(1025, -45000)
+        )
+
+        delta_gibbs_label[0].set_color(GREEN)
+        delta_gibbs_label[2].set_color(RED)
+
+        delta_gibbs = DecimalNumber(
+            bcc_fit(x_tracker.get_value()) - fcc_fit(x_tracker.get_value()),
+            num_decimal_places=2,
+            include_sign=True
+        ).next_to(
+            delta_gibbs_label, RIGHT
+        )
+
+        delta_gibbs_label_unit = Tex("J").next_to(delta_gibbs, RIGHT)
+
+        delta_gibbs.add_updater(
+            lambda d: d.set_value(
+                bcc_fit(x_tracker.get_value()) - fcc_fit(x_tracker.get_value())
+            )
+        )
+
+        self.play(
+            Create(zoomed_camera_frame)
+        )
+        self.activate_zooming()
+        self.play(
+            self.get_zoomed_display_pop_out_animation()
+        )
+        self.wait()
+
+        self.play(
+            FadeIn(bcc_dot),
+            FadeIn(fcc_dot)
+        )
+        self.wait()
+
+        self.play(
+            LaggedStart(
+                Write(delta_gibbs_label),
+                Write(delta_gibbs),
+                Write(delta_gibbs_label_unit),
+                lag_ratio=0.2
+            )
+        )
+        self.wait()
+
+        self.play(
+            x_tracker.animate.set_value(intersect_x)
+        )
+        self.wait()
+
+        self.play(
+            x_tracker.animate.set_value(x_max)
+        )
+        self.wait()
