@@ -4,6 +4,32 @@ from manim import *
 from scipy import interpolate
 
 
+class TitleSlide(Scene):
+    def construct(self):
+        # title
+        title = Text("Introduction to\nClassical Nucleation Theory",
+                     font_size=45)
+        title.shift(UP * 1.2)
+
+        # thermocalc logo
+        logo = SVGMobject(
+            r"C:\Users\rpw19\PycharmProjects\matsci_animation\figure\ThermoCalc_logo.svg"
+        ).set(height=config["frame_height"] * 0.15).set_color("#9b193b")
+        logo.scale(1.2)
+        logo.align_to(title, LEFT).shift(DOWN * 1.5)
+
+        # name and affiliation
+        name = Text("Peiwen Ren", font_size=40, slant=ITALIC)
+        affiliation = Text(
+            "Summer Intern\nThermo-Calc Software\n06/03/2022",
+            font_size=30)
+        name.next_to(logo, RIGHT, buff=0.3).align_to(logo, UP)
+        affiliation.next_to(name, DOWN).align_to(name, LEFT)
+
+        self.add(title, logo, name, affiliation)
+        self.wait()
+
+
 class CriticalRadius(Scene):
     def construct(self):
         # define the plotting axes
