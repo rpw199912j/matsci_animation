@@ -615,14 +615,14 @@ class CrossOver(ZoomedScene):
     def __init__(self):
         ZoomedScene.__init__(
             self,
-            zoomed_display_width=5,
+            zoomed_display_width=3,
             zoomed_display_height=3
         )
 
     def construct(self):
         # define the axes
-        x_min, x_max, x_step = 990, 1030, 5
-        y_min, y_max, y_step = -46500, -43000, 500
+        x_min, x_max, x_step = 990, 1030, 10
+        y_min, y_max, y_step = -46500, -43000, 1000
         axes = Axes(
             x_range=[x_min, x_max, x_step],
             y_range=[y_min, y_max, y_step],
@@ -631,16 +631,51 @@ class CrossOver(ZoomedScene):
             tips=False
         )
 
-        # add the axes labels
-        x_label = axes.get_x_axis_label(Tex("$T$"))
-        y_label = axes.get_y_axis_label(Tex("$G$"), edge=LEFT, direction=LEFT)
+        # get the axes
+        x_axis = axes.get_x_axis()
+        y_axis = axes.get_y_axis()
 
-        self.add(axes)
+        # add the axes labels
+        x_label = axes.get_x_axis_label(Tex("$T$ (K)")).shift(0.2 * RIGHT + 0.5 * DOWN)
+        y_label = axes.get_y_axis_label(
+            Tex("$G$ (kJ/mol)").rotate(PI / 2), edge=LEFT, direction=LEFT, buff=1
+        )
+
+        # add custom axes tick labels
+        values_x = [
+            (tick_val, str(tick_val))
+            for tick_val in np.arange(x_min, x_max + x_step, x_step)
+        ]
+        values_y = [
+            (tick_val, str(tick_val / 1e3))
+            for tick_val in np.arange(y_min, y_max, y_step)
+        ]
+
+        x_axis_labels = VGroup()
+        y_axis_labels = VGroup()
+
+        for x_val, x_tex in values_x:
+            tex = Tex(x_tex, font_size=35)  # Convert string to tex
+            tex.next_to(x_axis.n2p(x_val), UP)  # Put tex on the position
+            x_axis_labels.add(tex)
+
+        for y_val, y_tex in values_y:
+            tex = Tex(y_tex, font_size=35)  # Convert string to tex
+            tex.next_to(y_axis.n2p(y_val), LEFT)  # Put tex on the position
+            y_axis_labels.add(tex)
+
+        self.add(x_axis, y_axis)
         self.wait()
 
         self.play(
             Write(x_label),
             Write(y_label)
+        )
+        self.wait()
+        self.play(
+            Write(x_axis_labels),
+            Write(y_axis_labels),
+            run_time=0.8
         )
         self.wait()
 
@@ -650,6 +685,15 @@ class CrossOver(ZoomedScene):
         ).set(height=config["frame_height"] * 0.15).set_color("#9b193b").to_corner(UL)
         self.play(
             DrawBorderThenFill(thermocalc_logo)
+        )
+        self.wait()
+
+        # add the chemistry label
+        chemistry_label = Tex(
+            r"Fe-3wt\%Ni-4wt\%Cr", font_size=25
+        ).next_to(thermocalc_logo, DOWN, buff=0.5)
+        self.play(
+            Write(chemistry_label), run_time=0.5
         )
         self.wait()
 
@@ -694,21 +738,6 @@ class CrossOver(ZoomedScene):
         intersect_x_idx = np.argmin(np.abs(bcc_y_lst - fcc_y_lst))
         intersect_x = intersect_x_lst[intersect_x_idx]
 
-        # bcc_curve = axes.plot_line_graph(
-        #     x_values=bcc_gibbs[:, 0],
-        #     y_values=bcc_gibbs[:, 1],
-        #     add_vertex_dots=False,
-        #     line_color=GREEN,
-        #     stroke_width=2
-        # )
-        # fcc_curve = axes.plot_line_graph(
-        #     x_values=fcc_gibbs[:, 0],
-        #     y_values=fcc_gibbs[:, 1],
-        #     add_vertex_dots=False,
-        #     line_color=RED,
-        #     stroke_width=2
-        # )
-
         self.play(
             Create(bcc_curve)
         )
@@ -750,9 +779,10 @@ class CrossOver(ZoomedScene):
 
         # add the G_beta - G_alpha labels
         delta_gibbs_label = MathTex(
-            r"G_\beta", "-", r"G_\alpha", "="
+            r"&\;G_{\text{BCC}}", "-", r"G_{\text{FCC}}\\",
+            "&="
         ).move_to(
-            axes.c2p(1025, -45000)
+            axes.c2p(1035, -45000)
         )
 
         delta_gibbs_label[0].set_color(GREEN)
@@ -763,10 +793,12 @@ class CrossOver(ZoomedScene):
             num_decimal_places=2,
             include_sign=True
         ).next_to(
-            delta_gibbs_label, RIGHT
+            delta_gibbs_label[-1], RIGHT
         )
 
-        delta_gibbs_label_unit = Tex("J").next_to(delta_gibbs, RIGHT)
+        delta_gibbs_label_unit = Tex("J/mol").next_to(
+            delta_gibbs, RIGHT, buff=0.15
+        ).shift(0.05 * DOWN)
 
         delta_gibbs.add_updater(
             lambda d: d.set_value(
@@ -790,12 +822,7 @@ class CrossOver(ZoomedScene):
         self.wait()
 
         self.play(
-            LaggedStart(
-                Write(delta_gibbs_label),
-                Write(delta_gibbs),
-                Write(delta_gibbs_label_unit),
-                lag_ratio=0.2
-            )
+            Write(VGroup(delta_gibbs_label, delta_gibbs, delta_gibbs_label_unit))
         )
         self.wait()
 
@@ -806,5 +833,164 @@ class CrossOver(ZoomedScene):
 
         self.play(
             x_tracker.animate.set_value(x_max)
+        )
+        self.wait()
+
+        self.play(
+            x_tracker.animate.set_value(intersect_x)
+        )
+        self.wait()
+
+        # reverse and stop zooming
+        self.play(
+            self.get_zoomed_display_pop_out_animation(),
+            rate_func=lambda t: smooth(1 - t)
+        )
+
+        self.play(
+            FadeOut(zoomed_camera_frame, zoomed_display_frame)
+        )
+        self.remove(
+            self.zoomed_camera.frame,
+            self.zoomed_display.display_frame,
+            self.zoomed_display
+        )
+        self.zoom_activated = False
+        self.wait()
+
+        # add the T0 marker
+        T0_vline = DashedLine(
+            start=fcc_dot.get_center(),
+            end=axes.c2p(intersect_x, y_max),
+            color=BLUE,
+            z_index=-1,
+            stroke_width=3
+        )
+        T0_dot = Dot(
+            point=T0_vline.get_top(),
+            color=BLUE,
+            radius=0.05
+        )
+        T0_label = Tex("T$_0$", color=BLUE, font_size=35).next_to(
+            T0_dot, UP, buff=0.1
+        )
+
+        self.play(
+            Create(T0_vline)
+        )
+        self.play(
+            LaggedStart(
+                DrawBorderThenFill(T0_dot),
+                Write(T0_label),
+                lag_ratio=0.2
+            )
+        )
+        self.wait()
+
+        # write the T0 value
+        T0_eq = Tex(
+            "T$_0$", "$=$", f"{x_tracker.get_value():.2f}", "K",
+            font_size=35, arg_separator=" "
+        ).move_to(axes.c2p(1030, -43500)).align_to(
+            delta_gibbs_label, LEFT
+        )
+        T0_eq[0].set_color(BLUE)
+        self.play(
+            T0_label.copy().animate.move_to(T0_eq[0])
+        )
+        self.wait()
+
+        self.play(
+            Write(T0_eq[1:])
+        )
+        self.wait()
+
+        # visualize the under-cooling
+        T_vline = always_redraw(
+            lambda:
+            DashedLine(
+                start=bcc_dot.get_center(),
+                end=axes.c2p(x_tracker.get_value(), y_max),
+                color=YELLOW,
+                z_index=-2,
+                stroke_width=3
+            )
+        )
+        T_dot = always_redraw(
+            lambda:
+            Dot(
+                point=T_vline.get_top(),
+                color=YELLOW,
+                radius=0.05,
+                z_index=-2
+            )
+        )
+
+        self.add(T_vline, T_dot)
+        self.play(
+            x_tracker.animate.set_value(1013)
+        )
+        self.wait()
+
+        T_label = always_redraw(
+            lambda:
+            Tex("$T$", color=YELLOW, font_size=35).next_to(
+                T_dot, UP, buff=0.15
+            )
+        )
+        self.play(
+            Write(T_label)
+        )
+        self.wait()
+
+        # show the under-cooling
+        delta_T_hline = always_redraw(
+            lambda:
+            DashedLine(
+                start=T0_vline.get_center(),
+                end=[axes.c2p(x_tracker.get_value(), 0)[0], T0_vline.get_center()[1], 0],
+                stroke_width=3
+            )
+        )
+        delta_T_label = always_redraw(
+            lambda:
+            MathTex(
+                r"\Delta T", font_size=35
+            ).move_to(delta_T_hline.get_center()).shift(0.2 * UP)
+        )
+        delta_T_eq = MathTex(
+            r"\Delta T", "&=", r"\text{T}_0", "-", r"T\\",
+            "&=",
+            font_size=35
+        ).next_to(T0_eq[0], DOWN).align_to(T0_eq[0], LEFT)
+        delta_T_eq[2].set_color(BLUE)
+        delta_T_eq[4].set_color(YELLOW)
+
+        delta_T = DecimalNumber(
+            intersect_x - x_tracker.get_value(),
+            num_decimal_places=2,
+            font_size=35
+        ).next_to(
+            delta_T_eq[-1], RIGHT
+        )
+        delta_T.add_updater(lambda x: x.set_value(intersect_x - x_tracker.get_value()))
+
+        delta_T_unit_label = Tex("K", font_size=35).next_to(delta_T, RIGHT)
+
+        self.play(
+            Create(delta_T_hline), run_time=0.5
+        )
+        self.wait()
+        self.play(
+            Write(delta_T_label)
+        )
+        self.wait()
+        self.play(
+            Write(VGroup(delta_T_eq, delta_T, delta_T_unit_label))
+        )
+        self.wait()
+
+        self.play(
+            x_tracker.animate.set_value(1005)
         )
         self.wait()
