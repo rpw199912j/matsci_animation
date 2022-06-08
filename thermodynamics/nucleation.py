@@ -30,6 +30,16 @@ class TitleSlide(Scene):
         self.wait()
 
 
+class Background(Scene):
+    def construct(self):
+        slide_title = Tex(
+            "Background", font_size=30
+        ).to_corner(UL)
+
+        self.add(slide_title)
+        self.wait()
+
+
 class CriticalRadius(Scene):
     def construct(self):
         # define the plotting axes
