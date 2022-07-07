@@ -1,5 +1,6 @@
 from typing import Tuple
 
+import time
 import numpy as np
 import pymunk
 from scipy.spatial import ConvexHull
@@ -154,18 +155,18 @@ class CollisionScene(Scene):
         current_size = len(self.nuc_cluster)
 
         # set detachment probability before reaching the critical size
-        if current_size <= self.critical_size:
+        if current_size < self.critical_size:
             detachment_prob = 1 / (90 * 7)
         # set detachment probability after reaching the critical size
-        elif current_size < 50:
-            # linearly increase detachment prob based on nucleus size
-            detachment_prob = np.interp(x=current_size,
-                                        xp=[self.critical_size, 100],
-                                        fp=[1 / (90 * 8),
-                                            1 / (90 * 6)])
         else:
+            # after reaching the critical size, turn off probabilistic detachment
             detachment_prob = -1
-        # get the convex hull
+
+        # probabilistic detachment
+        if rng.uniform(0, 1) <= detachment_prob:
+            self._detach(pymunk_space)
+
+        # get the convex hull (must be placed at the end of each simulation step)
         nuc_cluster_bodies = list(self.nuc_cluster_bodies)
         if len(nuc_cluster_bodies) >= 3:
             nuc_cluster_pos = [bod.position for bod in nuc_cluster_bodies]
@@ -176,21 +177,27 @@ class CollisionScene(Scene):
                                        if list(nuc_cluster_bodies[_].shapes)[0].collision_type != 10000 else 0
                                        for _ in convex_hull.vertices]
             # print(self.convex_mob_indices)
-        if rng.uniform(0, 1) <= detachment_prob:
-            self._detach(pymunk_space, nuc_cluster_bodies)
 
-    def _detach(self, pymunk_space, nuc_cluster_bodies):
-        if isinstance(self.convex_vertices, np.ndarray):
+    def _detach(self, pymunk_space):
+        nuc_cluster_bodies_at_detach = list(self.nuc_cluster_bodies)
+        convex_vertices = None
+        if len(nuc_cluster_bodies_at_detach) >= 3:
+            nuc_cluster_pos = [bod.position for bod in nuc_cluster_bodies_at_detach]
+            convex_hull = ConvexHull(nuc_cluster_pos)
+            convex_vertices = convex_hull.vertices
+
+        if isinstance(convex_vertices, np.ndarray):
             # choose a random convex hull vertex
-            vertex_selected_idx = rng.choice(a=self.convex_vertices)
-            body_to_remove = nuc_cluster_bodies[vertex_selected_idx]
+            vertex_selected_idx = rng.choice(a=convex_vertices)
+            body_to_remove = nuc_cluster_bodies_at_detach[vertex_selected_idx]
             cluster_remove_idx = list(body_to_remove.shapes)[0].collision_type
             dist_to_core = body_to_remove.position.get_distance(self.anchor_pos)
             # get all the joints connected to the selected vertex
             body_selected_joints = body_to_remove.constraints
 
-            # apply force upon detachment
-            if (cluster_remove_idx not in {0, 10000}) and (dist_to_core > 0.24 * 3):
+            # detach only when the particle to be removed is not the initial nucleation site,
+            # and if it isn't, it should not be too close to the initial nucleation site
+            if (cluster_remove_idx not in {0, 10000}) and (dist_to_core > 0.24 * 2):
                 self.particle_mobs[cluster_remove_idx].set_color(PURPLE)
                 # remove the selected joint from the physics simulation
                 for joint in body_selected_joints:
@@ -212,6 +219,7 @@ class CollisionScene(Scene):
                 # if non-zero velocity, apply a force in the direction of moving
                 if v_mag > 0:
                     v_dir = v_vec / v_mag
+                    # apply force upon detachment
                     body_to_remove.apply_force_at_local_point(force=tuple(0.01 * v_dir))
 
     def _begin(self, arbiter, space, data):
@@ -235,6 +243,15 @@ class CollisionScene(Scene):
                 self.nuc_cluster = self.nuc_cluster.union({i1, i2})
                 self.nuc_cluster_bodies = self.nuc_cluster_bodies.union({b1.body, b2.body})
                 print(f" size of nucleus: {len(self.nuc_cluster)}")
+
+                if len(self.nuc_cluster) >= self.critical_size:
+                    # set up a breakout time for the while loop
+                    timeout = time.time() + 2
+                    while (len(self.nuc_cluster) > self.critical_size) and (
+                            growth_tracker.get_value() == MAINTAIN_CRIT_SIZE):
+                        self._detach(space)
+                        if time.time() > timeout:
+                            break
         return True
 
     def make_static_body(
@@ -318,6 +335,10 @@ MAINTAIN = 10
 HEAT = 20
 COOL = 5
 temp_tracker = ValueTracker(MAINTAIN)
+# set the growth behavior
+MAINTAIN_CRIT_SIZE = 1
+GROW_BEYOND_CRIT_SIZE = 0
+growth_tracker = ValueTracker(MAINTAIN_CRIT_SIZE)
 # set seed to ensure reproducible initial particle positions
 seed = 31415926
 rng = np.random.default_rng(seed)
@@ -408,7 +429,7 @@ class CollisionFixed(CollisionScene):
         def draw_convex_hull():
             """Helper function to draw the convex hull"""
             if isinstance(self.convex_vertices, np.ndarray):
-                if len(self.nuc_cluster) < 50:
+                if len(self.nuc_cluster) < self.critical_size:
                     return Polygon(
                         *[self.particle_mobs[idx].get_center() for idx in self.convex_mob_indices],
                         color=PURPLE
@@ -420,6 +441,7 @@ class CollisionFixed(CollisionScene):
                     )
             else:
                 return Polygon([0, 0, 0], [0, 0, 0], [0, 0, 0], stroke_opacity=0, fill_opacity=0)
+
         # draw the convex hull
         convex_hull = always_redraw(
             draw_convex_hull
@@ -429,6 +451,16 @@ class CollisionFixed(CollisionScene):
         )
 
         self.wait(8)
+
+        for _ in range(5):
+            temp_tracker.set_value(HEAT)
+            self.wait(1)
+
+            temp_tracker.set_value(MAINTAIN)
+            self.wait(4)
+
+        # let the nucleus grow beyond the critical size
+        growth_tracker.set_value(GROW_BEYOND_CRIT_SIZE)
 
         for _ in range(5):
             temp_tracker.set_value(HEAT)
