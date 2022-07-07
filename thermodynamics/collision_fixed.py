@@ -157,26 +157,27 @@ class CollisionScene(Scene):
         if current_size <= self.critical_size:
             detachment_prob = 1 / (90 * 7)
         # set detachment probability after reaching the critical size
-        else:
+        elif current_size < 50:
             # linearly increase detachment prob based on nucleus size
             detachment_prob = np.interp(x=current_size,
                                         xp=[self.critical_size, 100],
                                         fp=[1 / (90 * 8),
                                             1 / (90 * 6)])
-            # detachment_prob = -1
+        else:
+            detachment_prob = -1
+        # get the convex hull
+        nuc_cluster_bodies = list(self.nuc_cluster_bodies)
+        if len(nuc_cluster_bodies) >= 3:
+            nuc_cluster_pos = [bod.position for bod in nuc_cluster_bodies]
+            convex_hull = ConvexHull(nuc_cluster_pos)
+            self.convex_vertices = convex_hull.vertices
+            # convert from cluster index to the mobject index
+            self.convex_mob_indices = [list(nuc_cluster_bodies[_].shapes)[0].collision_type
+                                       if list(nuc_cluster_bodies[_].shapes)[0].collision_type != 10000 else 0
+                                       for _ in convex_hull.vertices]
+            # print(self.convex_mob_indices)
         if rng.uniform(0, 1) <= detachment_prob:
             existing_joints = self.joints
-            # get the convex hull
-            nuc_cluster_bodies = list(self.nuc_cluster_bodies)
-            if len(nuc_cluster_bodies) >= 3:
-                nuc_cluster_pos = [bod.position for bod in nuc_cluster_bodies]
-                convex_hull = ConvexHull(nuc_cluster_pos)
-                self.convex_vertices = convex_hull.vertices
-                # convert from cluster index to the mobject index
-                self.convex_mob_indices = [list(nuc_cluster_bodies[_].shapes)[0].collision_type
-                                           if list(nuc_cluster_bodies[_].shapes)[0].collision_type != 10000 else 0
-                                           for _ in convex_hull.vertices]
-                # print(self.convex_mob_indices)
             if isinstance(self.convex_vertices, np.ndarray):
                 # randomly choose an arbitrary convex vertex
                 vertex_selected_idx = rng.choice(a=self.convex_vertices)
@@ -418,14 +419,24 @@ class CollisionFixed(CollisionScene):
                 collision_type=_ + 1
             )
 
+        def draw_convex_hull():
+            """Helper function to draw the convex hull"""
+            if isinstance(self.convex_vertices, np.ndarray):
+                if len(self.nuc_cluster) < 50:
+                    return Polygon(
+                        *[self.particle_mobs[idx].get_center() for idx in self.convex_mob_indices],
+                        color=PURPLE
+                    )
+                else:
+                    return Polygon(
+                        *[self.particle_mobs[idx].get_center() for idx in self.convex_mob_indices],
+                        color=YELLOW
+                    )
+            else:
+                return Polygon([0, 0, 0], [0, 0, 0], [0, 0, 0], stroke_opacity=0, fill_opacity=0)
+        # draw the convex hull
         convex_hull = always_redraw(
-            lambda:
-            Polygon(
-                *[self.particle_mobs[idx].get_center() for idx in self.convex_mob_indices],
-                color=PURPLE
-            )
-            if isinstance(self.convex_vertices, np.ndarray) else Polygon([0, 0, 0], [0, 0, 0], [0, 0, 0],
-                                                                         stroke_opacity=0, fill_opacity=0)
+            draw_convex_hull
         )
         self.play(
             Create(convex_hull)
@@ -433,7 +444,7 @@ class CollisionFixed(CollisionScene):
 
         self.wait(8)
 
-        for _ in range(2):
+        for _ in range(5):
             temp_tracker.set_value(HEAT)
             self.wait(1)
 
