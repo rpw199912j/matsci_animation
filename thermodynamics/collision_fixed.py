@@ -177,55 +177,42 @@ class CollisionScene(Scene):
                                        for _ in convex_hull.vertices]
             # print(self.convex_mob_indices)
         if rng.uniform(0, 1) <= detachment_prob:
-            existing_joints = self.joints
-            if isinstance(self.convex_vertices, np.ndarray):
-                # randomly choose an arbitrary convex vertex
-                vertex_selected_idx = rng.choice(a=self.convex_vertices)
-                body_to_remove = nuc_cluster_bodies[vertex_selected_idx]
-                cluster_remove_idx = list(body_to_remove.shapes)[0].collision_type
-                dist_to_core = body_to_remove.position.get_distance(self.anchor_pos)
-                # get all the joints connected to the selected vertex
-                body_selected_joints = body_to_remove.constraints
-                # print(f"{body_selected_joints}\n")
-                #############################################################
-                # # get the two particles at the two ends of the selected joint
-                # b1, b2 = joint_selected.a, joint_selected.b
-                # # calculate each particle's distance to the initial nucleation site
-                # dist_1 = b1.position.get_distance(self.anchor_pos)
-                # dist_2 = b2.position.get_distance(self.anchor_pos)
-                # if dist_1 > dist_2:
-                #     cluster_remove_idx = list(b1.shapes)[0].collision_type
-                #     body_to_remove = b1
-                # else:
-                #     cluster_remove_idx = list(b2.shapes)[0].collision_type
-                #     body_to_remove = b2
-                #############################################################
+            self._detach(pymunk_space, nuc_cluster_bodies)
 
-                # existing_joints.remove(joint_selected)
-                # apply force upon detachment
-                if (cluster_remove_idx not in {0, 10000}) and (dist_to_core > 0.24 * 3):
-                    self.particle_mobs[cluster_remove_idx].set_color(PURPLE)
-                    # remove the selected joint from the physics simulation
-                    for joint in body_selected_joints:
-                        # TODO: temporary fix, need to look into why the same joint is selected more than once
-                        try:
-                            pymunk_space.remove(joint)
-                        except AssertionError:
-                            continue
+    def _detach(self, pymunk_space, nuc_cluster_bodies):
+        if isinstance(self.convex_vertices, np.ndarray):
+            # choose a random convex hull vertex
+            vertex_selected_idx = rng.choice(a=self.convex_vertices)
+            body_to_remove = nuc_cluster_bodies[vertex_selected_idx]
+            cluster_remove_idx = list(body_to_remove.shapes)[0].collision_type
+            dist_to_core = body_to_remove.position.get_distance(self.anchor_pos)
+            # get all the joints connected to the selected vertex
+            body_selected_joints = body_to_remove.constraints
 
+            # apply force upon detachment
+            if (cluster_remove_idx not in {0, 10000}) and (dist_to_core > 0.24 * 3):
+                self.particle_mobs[cluster_remove_idx].set_color(PURPLE)
+                # remove the selected joint from the physics simulation
+                for joint in body_selected_joints:
+                    # TODO: temporary fix, need to look into why the same joint is selected more than once
                     try:
-                        self.nuc_cluster.remove(cluster_remove_idx)
-                        self.nuc_cluster_bodies.remove(body_to_remove)
-                    except KeyError:
-                        pass
-                    # get the radial velocity direction
-                    v_vec = np.array([body_to_remove.position[0], body_to_remove.position[1]]) - np.array(
-                        [*self.anchor_pos])
-                    v_mag = np.linalg.norm(v_vec)
-                    # if non-zero velocity, apply a force in the direction of moving
-                    if v_mag > 0:
-                        v_dir = v_vec / v_mag
-                        body_to_remove.apply_force_at_local_point(force=tuple(0.01 * v_dir))
+                        pymunk_space.remove(joint)
+                    except AssertionError:
+                        continue
+
+                try:
+                    self.nuc_cluster.remove(cluster_remove_idx)
+                    self.nuc_cluster_bodies.remove(body_to_remove)
+                except KeyError:
+                    pass
+                # get the radial velocity direction
+                v_vec = np.array([body_to_remove.position[0], body_to_remove.position[1]]) - np.array(
+                    [*self.anchor_pos])
+                v_mag = np.linalg.norm(v_vec)
+                # if non-zero velocity, apply a force in the direction of moving
+                if v_mag > 0:
+                    v_dir = v_vec / v_mag
+                    body_to_remove.apply_force_at_local_point(force=tuple(0.01 * v_dir))
 
     def _begin(self, arbiter, space, data):
         """Callback function to set attachment at a given probability upon collision"""
@@ -245,7 +232,6 @@ class CollisionScene(Scene):
             if rng.uniform(0, 1) <= attachment_prob:
                 joint = pymunk.PinJoint(b1.body, b2.body)
                 space.add(joint)
-                self.joints.append(joint)
                 self.nuc_cluster = self.nuc_cluster.union({i1, i2})
                 self.nuc_cluster_bodies = self.nuc_cluster_bodies.union({b1.body, b2.body})
                 print(f" size of nucleus: {len(self.nuc_cluster)}")
