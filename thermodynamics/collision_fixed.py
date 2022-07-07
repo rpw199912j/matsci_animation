@@ -36,6 +36,10 @@ class CollisionScene(Scene):
         self.space = Space(gravity=self.GRAVITY)
         self.joints = []
         self.nuc_cluster = {0}
+        self.nuc_cluster_bodies = set()
+        self.particle_mobs = [Mobject()]
+        self.convex_vertices = []
+        self.convex_mob_indices = []
         self.anchor_pos = None
         self.critical_size = crit_size
         super().__init__(renderer=renderer, **kwargs)
@@ -81,6 +85,9 @@ class CollisionScene(Scene):
                 return self.make_rigid_body(*mob)
             if not hasattr(mob, "body"):
                 parts = mob.family_members_with_points()
+                # remove after testing
+                self.particle_mobs.append(mob)
+                ######################
                 for p in parts:
                     self.add(p)
                     p.body = pymunk.Body()
@@ -159,32 +166,60 @@ class CollisionScene(Scene):
             # detachment_prob = -1
         if rng.uniform(0, 1) <= detachment_prob:
             existing_joints = self.joints
-            if existing_joints:
-                # randomly choose an arbitrary joint
-                joint_selected_idx = rng.choice(a=len(existing_joints))
-                joint_selected = existing_joints[joint_selected_idx]
-                # get the two particles at the two ends of the selected joint
-                b1, b2 = joint_selected.a, joint_selected.b
-                # calculate each particle's distance to the initial nucleation site
-                dist_1 = b1.position.get_distance(self.anchor_pos)
-                dist_2 = b2.position.get_distance(self.anchor_pos)
-                if dist_1 > dist_2:
-                    cluster_remove_idx = list(b1.shapes)[0].collision_type
-                    body_to_remove = b1
-                else:
-                    cluster_remove_idx = list(b2.shapes)[0].collision_type
-                    body_to_remove = b2
-                # remove the selected joint from the physics simulation
-                pymunk_space.remove(joint_selected)
-                existing_joints.remove(joint_selected)
+            # get the convex hull
+            nuc_cluster_bodies = list(self.nuc_cluster_bodies)
+            if len(nuc_cluster_bodies) >= 3:
+                nuc_cluster_pos = [bod.position for bod in nuc_cluster_bodies]
+                convex_hull = ConvexHull(nuc_cluster_pos)
+                self.convex_vertices = convex_hull.vertices
+                # convert from cluster index to the mobject index
+                self.convex_mob_indices = [list(nuc_cluster_bodies[_].shapes)[0].collision_type
+                                           if list(nuc_cluster_bodies[_].shapes)[0].collision_type != 10000 else 0
+                                           for _ in convex_hull.vertices]
+                # print(self.convex_mob_indices)
+            if isinstance(self.convex_vertices, np.ndarray):
+                # randomly choose an arbitrary convex vertex
+                vertex_selected_idx = rng.choice(a=self.convex_vertices)
+                body_to_remove = nuc_cluster_bodies[vertex_selected_idx]
+                cluster_remove_idx = list(body_to_remove.shapes)[0].collision_type
+                dist_to_core = body_to_remove.position.get_distance(self.anchor_pos)
+                # get all the joints connected to the selected vertex
+                body_selected_joints = body_to_remove.constraints
+                # print(f"{body_selected_joints}\n")
+                #############################################################
+                # # get the two particles at the two ends of the selected joint
+                # b1, b2 = joint_selected.a, joint_selected.b
+                # # calculate each particle's distance to the initial nucleation site
+                # dist_1 = b1.position.get_distance(self.anchor_pos)
+                # dist_2 = b2.position.get_distance(self.anchor_pos)
+                # if dist_1 > dist_2:
+                #     cluster_remove_idx = list(b1.shapes)[0].collision_type
+                #     body_to_remove = b1
+                # else:
+                #     cluster_remove_idx = list(b2.shapes)[0].collision_type
+                #     body_to_remove = b2
+                #############################################################
+
+                # existing_joints.remove(joint_selected)
                 # apply force upon detachment
-                if cluster_remove_idx != 0:
+                if (cluster_remove_idx not in {0, 10000}) and (dist_to_core > 0.24 * 3):
+                    self.particle_mobs[cluster_remove_idx].set_color(PURPLE)
+                    # remove the selected joint from the physics simulation
+                    for joint in body_selected_joints:
+                        # TODO: temporary fix, need to look into why the same joint is selected more than once
+                        try:
+                            pymunk_space.remove(joint)
+                        except AssertionError:
+                            continue
+
                     try:
                         self.nuc_cluster.remove(cluster_remove_idx)
+                        self.nuc_cluster_bodies.remove(body_to_remove)
                     except KeyError:
                         pass
-                    # get the velocity direction
-                    v_vec = np.array([body_to_remove.velocity[0], body_to_remove.velocity[1]])
+                    # get the radial velocity direction
+                    v_vec = np.array([body_to_remove.position[0], body_to_remove.position[1]]) - np.array(
+                        [*self.anchor_pos])
                     v_mag = np.linalg.norm(v_vec)
                     # if non-zero velocity, apply a force in the direction of moving
                     if v_mag > 0:
@@ -198,7 +233,7 @@ class CollisionScene(Scene):
         # set attachment behavior
         current_size = len(self.nuc_cluster)
         # attach only when one of the two particles colliding is in the existing nucleus
-        if i1 in self.nuc_cluster or i2 in self.nuc_cluster:
+        if (i1 in self.nuc_cluster or i2 in self.nuc_cluster) and 10000 not in {i1, i2}:
             # set attachment probability before reaching the critical size
             if current_size <= self.critical_size:
                 attachment_prob = 0.7
@@ -211,6 +246,7 @@ class CollisionScene(Scene):
                 space.add(joint)
                 self.joints.append(joint)
                 self.nuc_cluster = self.nuc_cluster.union({i1, i2})
+                self.nuc_cluster_bodies = self.nuc_cluster_bodies.union({b1.body, b2.body})
                 print(f" size of nucleus: {len(self.nuc_cluster)}")
         return True
 
@@ -239,6 +275,7 @@ class CollisionScene(Scene):
             mob.shape.collision_type = collision_type
             if collision_type == 0:
                 self.anchor_pos = mob.body.position
+                self.nuc_cluster_bodies = {mob.body}
             self.add_body(mob)
 
     def stop_rigidity(self, *mobs: Mobject) -> None:
@@ -380,6 +417,19 @@ class CollisionFixed(CollisionScene):
                 friction=0,
                 collision_type=_ + 1
             )
+
+        convex_hull = always_redraw(
+            lambda:
+            Polygon(
+                *[self.particle_mobs[idx].get_center() for idx in self.convex_mob_indices],
+                color=PURPLE
+            )
+            if isinstance(self.convex_vertices, np.ndarray) else Polygon([0, 0, 0], [0, 0, 0], [0, 0, 0],
+                                                                         stroke_opacity=0, fill_opacity=0)
+        )
+        self.play(
+            Create(convex_hull)
+        )
 
         self.wait(8)
 
