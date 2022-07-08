@@ -350,6 +350,7 @@ class CollisionFixed(CollisionScene):
     def __init__(self, crit_size=30, renderer=None, **kwargs):
         super().__init__(crit_size, renderer, **kwargs)
         self.nucleus_size_axis = None
+        self.size_count_arr = np.array([[0, 1]])
 
     def construct(self):
         axes = Axes(
@@ -426,7 +427,7 @@ class CollisionFixed(CollisionScene):
         # add y_ticks inplace
         y_axis = nucleus_size_axis.y_axis
         ticks = VGroup()
-        for _ in [0, self.critical_size, NUM_PARTICLES]:
+        for _ in [self.critical_size, NUM_PARTICLES]:
             ticks.add(y_axis.get_tick(_, y_axis.tick_size))
         y_axis.add(ticks)
         y_axis.ticks = ticks
@@ -444,6 +445,13 @@ class CollisionFixed(CollisionScene):
                     y_axis_config={"numbers_to_include": [0, self.critical_size, NUM_PARTICLES],
                                    "font_size": 25, "include_ticks": False}
                 ).to_edge(RIGHT)
+
+                y_axis_updated = ax_to_become.y_axis
+                ticks_updated = VGroup()
+                for _ in [self.critical_size, NUM_PARTICLES]:
+                    ticks_updated.add(y_axis_updated.get_tick(_, y_axis_updated.tick_size))
+                y_axis_updated.add(ticks_updated)
+                y_axis_updated.ticks = ticks_updated
             ax.become(ax_to_become)
             self.nucleus_size_axis = ax_to_become
 
@@ -465,7 +473,17 @@ class CollisionFixed(CollisionScene):
         )
 
         time_tracker = ValueTracker(0)
-        time_tracker.add_updater(lambda t, dt: t.increment_value(dt))
+
+        def update_time(tracker, dt):
+            tracker.increment_value(dt)
+            self.size_count_arr = np.append(
+                self.size_count_arr,
+                np.array([[time_tracker.get_value(), len(self.nuc_cluster)]]),
+                axis=0
+            )
+
+        time_tracker.add_updater(update_time)
+
         nucleus_size_counter_dot = always_redraw(
             lambda:
             Dot(
@@ -473,7 +491,16 @@ class CollisionFixed(CollisionScene):
                 radius=0.06
             )
         )
-        counter_dot_path = TracedPath(nucleus_size_counter_dot.get_center)
+        counter_dot_path = always_redraw(
+            lambda:
+            self.nucleus_size_axis.plot_line_graph(
+                x_values=self.size_count_arr[:, 0],
+                y_values=self.size_count_arr[:, 1],
+                line_color=WHITE,
+                add_vertex_dots=False,
+                stroke_width=2
+            )
+        )
         self.add(time_tracker)
         time_tracker.suspend_updating()
         self.play(
