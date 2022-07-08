@@ -247,7 +247,7 @@ class CollisionScene(Scene):
                 if len(self.nuc_cluster) >= self.critical_size:
                     # set up a breakout time for the while loop
                     timeout = time.time() + 2
-                    while (len(self.nuc_cluster) > self.critical_size) and (
+                    while (len(self.nuc_cluster) > self.critical_size - rng.choice(a=3)) and (
                             growth_tracker.get_value() == MAINTAIN_CRIT_SIZE):
                         self._detach(space)
                         if time.time() > timeout:
@@ -345,8 +345,12 @@ rng = np.random.default_rng(seed)
 
 
 # run the following command in the terminal to start simulation
-# manim -p -r 1920,1080 --fps 90 --disable_caching --flush_cache <path to collision_fixed.py> CollisionFixed
+# manim -p -r 1920,1080 --fps 120 --disable_caching --flush_cache <path to collision_fixed.py> CollisionFixed
 class CollisionFixed(CollisionScene):
+    def __init__(self, crit_size=30, renderer=None, **kwargs):
+        super().__init__(crit_size, renderer, **kwargs)
+        self.nucleus_size_axis = None
+
     def construct(self):
         axes = Axes(
             x_range=[0, 10],
@@ -406,6 +410,82 @@ class CollisionFixed(CollisionScene):
         )
         self.wait()
 
+        # show the nucleus size counter
+        nucleus_size_axis = Axes(
+            x_range=[0, 30, 30],
+            y_range=[0, NUM_PARTICLES, 10],
+            x_length=2.5,
+            y_length=2,
+            tips=False,
+            y_axis_config={"numbers_to_include": [0, self.critical_size, NUM_PARTICLES],
+                           "font_size": 25, "include_ticks": False}
+        ).to_edge(RIGHT)
+
+        self.nucleus_size_axis = nucleus_size_axis
+
+        # add y_ticks inplace
+        y_axis = nucleus_size_axis.y_axis
+        ticks = VGroup()
+        for _ in [0, self.critical_size, NUM_PARTICLES]:
+            ticks.add(y_axis.get_tick(_, y_axis.tick_size))
+        y_axis.add(ticks)
+        y_axis.ticks = ticks
+
+        def update_axes(ax):
+            ax_to_become = ax
+            current_time = time_tracker.get_value()
+            if current_time >= 30:
+                ax_to_become = Axes(
+                    x_range=[0, current_time, current_time],
+                    y_range=[0, NUM_PARTICLES, 10],
+                    x_length=2.5,
+                    y_length=2,
+                    tips=False,
+                    y_axis_config={"numbers_to_include": [0, self.critical_size, NUM_PARTICLES],
+                                   "font_size": 25, "include_ticks": False}
+                ).to_edge(RIGHT)
+            ax.become(ax_to_become)
+            self.nucleus_size_axis = ax_to_become
+
+        nucleus_size_axis.add_updater(update_axes)
+
+        # add horizontal dashed line at critical size
+        crit_hline = DashedLine(
+            start=nucleus_size_axis.c2p(nucleus_size_axis.x_range[0], self.critical_size),
+            end=nucleus_size_axis.c2p(nucleus_size_axis.x_range[1], self.critical_size),
+            color=YELLOW, stroke_width=1
+        )
+
+        # get the axis labels
+        nucleus_size_x_label = nucleus_size_axis.get_x_axis_label(
+            MathTex("t", font_size=25)
+        )
+        nucleus_size_y_label = nucleus_size_axis.get_y_axis_label(
+            Tex(r"\# of nucleus particles", font_size=25).rotate(PI / 2), edge=LEFT, direction=LEFT, buff=0.1
+        )
+
+        time_tracker = ValueTracker(0)
+        time_tracker.add_updater(lambda t, dt: t.increment_value(dt))
+        nucleus_size_counter_dot = always_redraw(
+            lambda:
+            Dot(
+                point=self.nucleus_size_axis.c2p(time_tracker.get_value(), len(self.nuc_cluster)),
+                radius=0.06
+            )
+        )
+        counter_dot_path = TracedPath(nucleus_size_counter_dot.get_center)
+        self.add(time_tracker)
+        time_tracker.suspend_updating()
+        self.play(
+            FadeIn(nucleus_size_axis),
+            Write(nucleus_size_x_label),
+            Write(nucleus_size_y_label),
+            DrawBorderThenFill(nucleus_size_counter_dot),
+            FadeIn(counter_dot_path)
+        )
+        self.play(Create(crit_hline))
+        self.wait()
+
         # start the collision simulation
         self.make_static_body(
             bounding_box,
@@ -426,30 +506,30 @@ class CollisionFixed(CollisionScene):
                 collision_type=_ + 1
             )
 
-        def draw_convex_hull():
+        def draw_convex_hull(poly, dt):
             """Helper function to draw the convex hull"""
+            _ = dt + 1  # TODO: just a dummy line to test the effect of dt
             if isinstance(self.convex_vertices, np.ndarray):
                 if len(self.nuc_cluster) < self.critical_size:
-                    return Polygon(
+                    poly.become(Polygon(
                         *[self.particle_mobs[idx].get_center() for idx in self.convex_mob_indices],
                         color=PURPLE
-                    )
+                    ))
                 else:
-                    return Polygon(
+                    poly.become(Polygon(
                         *[self.particle_mobs[idx].get_center() for idx in self.convex_mob_indices],
                         color=YELLOW
-                    )
+                    ))
             else:
-                return Polygon([0, 0, 0], [0, 0, 0], [0, 0, 0], stroke_opacity=0, fill_opacity=0)
+                poly.become(Polygon([0, 0, 0], [0, 0, 0], [0, 0, 0], stroke_opacity=0, fill_opacity=0))
 
         # draw the convex hull
-        convex_hull = always_redraw(
-            draw_convex_hull
-        )
+        convex_hull = Polygon([0, 0, 0], [0, 0, 0], [0, 0, 0], stroke_opacity=0, fill_opacity=0)
+        convex_hull.add_updater(draw_convex_hull)
         self.play(
             Create(convex_hull)
         )
-
+        time_tracker.resume_updating()
         self.wait(8)
 
         for _ in range(5):
@@ -459,20 +539,20 @@ class CollisionFixed(CollisionScene):
             temp_tracker.set_value(MAINTAIN)
             self.wait(4)
 
-        # let the nucleus grow beyond the critical size
-        growth_tracker.set_value(GROW_BEYOND_CRIT_SIZE)
-
-        for _ in range(5):
-            temp_tracker.set_value(HEAT)
-            self.wait(1)
-
-            temp_tracker.set_value(MAINTAIN)
-            self.wait(4)
-
-        self.wait(4)
-
-        temp_tracker.set_value(COOL)
-        self.wait(4)
+        # # let the nucleus grow beyond the critical size
+        # growth_tracker.set_value(GROW_BEYOND_CRIT_SIZE)
+        #
+        # for _ in range(5):
+        #     temp_tracker.set_value(HEAT)
+        #     self.wait(1)
+        #
+        #     temp_tracker.set_value(MAINTAIN)
+        #     self.wait(4)
+        #
+        # self.wait(4)
+        #
+        # temp_tracker.set_value(COOL)
+        # self.wait(4)
 
         # temp_tracker.set_value(COOL)
         # self.wait(15)
