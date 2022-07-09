@@ -10,7 +10,9 @@ from manim import *
 
 # modified from https://github.com/Matheart/manim-physics/blob/main/src/manim_physics/rigid_mechanics.py
 # For manim < 0.15.0
-from manim.mobject.opengl_compatibility import ConvertToOpenGL
+# from manim.mobject.opengl_compatibility import ConvertToOpenGL
+# For manim >= 0.15.0
+from manim.mobject.opengl.opengl_compatibility import ConvertToOpenGL
 
 
 class Space(Mobject, metaclass=ConvertToOpenGL):
@@ -38,7 +40,7 @@ class CollisionScene(Scene):
         self.joints = []
         self.nuc_cluster = {0}
         self.nuc_cluster_bodies = set()
-        self.particle_mobs = [Mobject()]
+        self.particle_mobs = []
         self.convex_vertices = []
         self.convex_mob_indices = []
         self.anchor_pos = None
@@ -85,10 +87,9 @@ class CollisionScene(Scene):
             if isinstance(mob, VGroup):
                 return self.make_rigid_body(*mob)
             if not hasattr(mob, "body"):
-                parts = mob.family_members_with_points()
-                # remove after testing
+                # store each mobject
                 self.particle_mobs.append(mob)
-                ######################
+                parts = mob.family_members_with_points()
                 for p in parts:
                     self.add(p)
                     p.body = pymunk.Body()
@@ -135,21 +136,20 @@ class CollisionScene(Scene):
         coll_handler.begin = self._begin
         x, y = b.body.position
         # set color based on speed
-        vx, vy = b.body.velocity
-        speed = np.sqrt(vx ** 2 + vy ** 2)
+        velocity_vec = b.body.velocity
+        speed = velocity_vec.length
         b.set_color(interpolate_color(BLUE, RED,
                                       np.clip(speed / np.sqrt(v_max ** 2 + v_max ** 2), 0, 1)))
         b.move_to(x * RIGHT + y * UP)
         b.rotate(b.body.angle - b.angle)
         b.angle = b.body.angle
         # adjust the velocity based on the temperature
-        velocity_vex = np.array([vx, vy])
-        velocity_direction = velocity_vex / np.linalg.norm(velocity_vex)
+        velocity_direction = velocity_vec.normalized()
         if temp_tracker.get_value() == HEAT:
-            b.body.apply_force_at_local_point(force=tuple(0.03 * velocity_direction))
+            b.body.apply_force_at_local_point(force=0.03 * velocity_direction)
             # b.body.apply_force_at_local_point(force=tuple(rng.uniform(-1, 1, size=(2, 1))))
         elif temp_tracker.get_value() == COOL:
-            b.body.apply_force_at_local_point(force=tuple(-0.03 * velocity_direction))
+            b.body.apply_force_at_local_point(force=-0.03 * velocity_direction)
 
         # set detachment behavior
         current_size = len(self.nuc_cluster)
@@ -166,8 +166,13 @@ class CollisionScene(Scene):
         if rng.uniform(0, 1) <= detachment_prob:
             self._detach(pymunk_space)
 
-        # get the convex hull (must be placed at the end of each simulation step)
+        # update the convex hull
+        self._update_convex_hull()
+
+    def _update_convex_hull(self, return_bodies=False):
+        """Update the convex hull of the nucleus"""
         nuc_cluster_bodies = list(self.nuc_cluster_bodies)
+        # only construct the convex hull when there are at least 3 particles in the nucleus
         if len(nuc_cluster_bodies) >= 3:
             nuc_cluster_pos = [bod.position for bod in nuc_cluster_bodies]
             convex_hull = ConvexHull(nuc_cluster_pos)
@@ -175,20 +180,17 @@ class CollisionScene(Scene):
             # convert from cluster index to the mobject index
             self.convex_mob_indices = [list(nuc_cluster_bodies[_].shapes)[0].collision_type
                                        if list(nuc_cluster_bodies[_].shapes)[0].collision_type != 10000 else 0
-                                       for _ in convex_hull.vertices]
-            # print(self.convex_mob_indices)
+                                       for _ in self.convex_vertices]
+        if return_bodies:
+            return nuc_cluster_bodies
 
     def _detach(self, pymunk_space):
-        nuc_cluster_bodies_at_detach = list(self.nuc_cluster_bodies)
-        convex_vertices = None
-        if len(nuc_cluster_bodies_at_detach) >= 3:
-            nuc_cluster_pos = [bod.position for bod in nuc_cluster_bodies_at_detach]
-            convex_hull = ConvexHull(nuc_cluster_pos)
-            convex_vertices = convex_hull.vertices
+        # get the bodies in the nucleus cluster and right before detachment selection
+        nuc_cluster_bodies_at_detach = self._update_convex_hull(return_bodies=True)
 
-        if isinstance(convex_vertices, np.ndarray):
+        if isinstance(self.convex_vertices, np.ndarray):
             # choose a random convex hull vertex
-            vertex_selected_idx = rng.choice(a=convex_vertices)
+            vertex_selected_idx = rng.choice(a=self.convex_vertices)
             body_to_remove = nuc_cluster_bodies_at_detach[vertex_selected_idx]
             cluster_remove_idx = list(body_to_remove.shapes)[0].collision_type
             dist_to_core = body_to_remove.position.get_distance(self.anchor_pos)
@@ -201,9 +203,9 @@ class CollisionScene(Scene):
                 self.particle_mobs[cluster_remove_idx].set_color(PURPLE)
                 # remove the selected joint from the physics simulation
                 for joint in body_selected_joints:
-                    # TODO: temporary fix, need to look into why the same joint is selected more than once
                     try:
                         pymunk_space.remove(joint)
+                    # TODO: temporary fix, need to look into why the same joint is removed more than once
                     except AssertionError:
                         continue
 
@@ -212,20 +214,18 @@ class CollisionScene(Scene):
                     self.nuc_cluster_bodies.remove(body_to_remove)
                 except KeyError:
                     pass
-                # get the radial velocity direction
-                v_vec = np.array([body_to_remove.position[0], body_to_remove.position[1]]) - np.array(
-                    [*self.anchor_pos])
-                v_mag = np.linalg.norm(v_vec)
-                # if non-zero velocity, apply a force in the direction of moving
-                if v_mag > 0:
-                    v_dir = v_vec / v_mag
-                    # apply force upon detachment
-                    body_to_remove.apply_force_at_local_point(force=tuple(0.01 * v_dir))
+                # get the outward radial direction
+                v_vec = body_to_remove.position - self.anchor_pos
+                # apply a force in the outward radial direction of moving
+                v_dir = v_vec.normalized()
+                body_to_remove.apply_force_at_local_point(force=0.01 * v_dir)
+                # update the convex hull after each detachment
+                self._update_convex_hull()
 
     def _begin(self, arbiter, space, data):
         """Callback function to set attachment at a given probability upon collision"""
-        b1, b2 = arbiter.shapes
-        i1, i2 = b1.collision_type, b2.collision_type
+        s1, s2 = arbiter.shapes
+        i1, i2 = s1.collision_type, s2.collision_type
         # set attachment behavior
         current_size = len(self.nuc_cluster)
         # attach only when one of the two particles colliding is in the existing nucleus
@@ -238,12 +238,14 @@ class CollisionScene(Scene):
                 attachment_prob = 0.7
 
             if rng.uniform(0, 1) <= attachment_prob:
-                joint = pymunk.PinJoint(b1.body, b2.body)
+                joint = pymunk.PinJoint(s1.body, s2.body)
                 space.add(joint)
                 self.nuc_cluster = self.nuc_cluster.union({i1, i2})
-                self.nuc_cluster_bodies = self.nuc_cluster_bodies.union({b1.body, b2.body})
+                self.nuc_cluster_bodies = self.nuc_cluster_bodies.union({s1.body, s2.body})
                 print(f" size of nucleus: {len(self.nuc_cluster)}")
 
+                # when above the critical size,
+                # maintain the size by detaching particles for each attachment to the nuc_cluster
                 if len(self.nuc_cluster) >= self.critical_size:
                     # set up a breakout time for the while loop
                     timeout = time.time() + 2
@@ -278,6 +280,8 @@ class CollisionScene(Scene):
             mob.shape.friction = friction
             mob.shape.collision_type = collision_type
             if collision_type == 0:
+                self.particle_mobs.append(mob)
+                mob.body.position = mob.get_x(), mob.get_y()
                 self.anchor_pos = mob.body.position
                 self.nuc_cluster_bodies = {mob.body}
             self.add_body(mob)
@@ -344,8 +348,10 @@ seed = 31415926
 rng = np.random.default_rng(seed)
 
 
+# NOTE: better use manim>=0.15.0 for faster rendering speed
 # run the following command in the terminal to start simulation
 # manim -p -r 1920,1080 --fps 120 --disable_caching --flush_cache <path to collision_fixed.py> CollisionFixed
+# manim -p -r 3840,2160 --fps 120 --disable_caching --flush_cache .\thermodynamics\collision_fixed.py CollisionFixed
 class CollisionFixed(CollisionScene):
     def __init__(self, crit_size=30, renderer=None, **kwargs):
         super().__init__(crit_size, renderer, **kwargs)
@@ -412,8 +418,9 @@ class CollisionFixed(CollisionScene):
         self.wait()
 
         # show the nucleus size counter
+        nucleus_size_axis_x_max = 30
         nucleus_size_axis = Axes(
-            x_range=[0, 30, 30],
+            x_range=[0, nucleus_size_axis_x_max, nucleus_size_axis_x_max],
             y_range=[0, NUM_PARTICLES, 10],
             x_length=2.5,
             y_length=2,
@@ -432,10 +439,12 @@ class CollisionFixed(CollisionScene):
         y_axis.add(ticks)
         y_axis.ticks = ticks
 
+        time_tracker = ValueTracker(0)
+
         def update_axes(ax):
             ax_to_become = ax
             current_time = time_tracker.get_value()
-            if current_time >= 30:
+            if current_time >= nucleus_size_axis_x_max:
                 ax_to_become = Axes(
                     x_range=[0, current_time, current_time],
                     y_range=[0, NUM_PARTICLES, 10],
@@ -469,10 +478,8 @@ class CollisionFixed(CollisionScene):
             MathTex("t", font_size=25)
         )
         nucleus_size_y_label = nucleus_size_axis.get_y_axis_label(
-            Tex(r"\# of nucleus particles", font_size=25).rotate(PI / 2), edge=LEFT, direction=LEFT, buff=0.1
+            Tex("Nucleus Size", font_size=25).rotate(PI / 2), edge=LEFT, direction=LEFT, buff=0.1
         )
-
-        time_tracker = ValueTracker(0)
 
         def update_time(tracker, dt):
             tracker.increment_value(dt)
@@ -499,7 +506,7 @@ class CollisionFixed(CollisionScene):
                 line_color=WHITE,
                 add_vertex_dots=False,
                 stroke_width=2
-            )
+            )["line_graph"]
         )
         self.add(time_tracker)
         time_tracker.suspend_updating()
@@ -533,6 +540,8 @@ class CollisionFixed(CollisionScene):
                 collision_type=_ + 1
             )
 
+        time_tracker.resume_updating()
+
         def draw_convex_hull(poly, dt):
             """Helper function to draw the convex hull"""
             _ = dt + 1  # TODO: just a dummy line to test the effect of dt
@@ -553,10 +562,7 @@ class CollisionFixed(CollisionScene):
         # draw the convex hull
         convex_hull = Polygon([0, 0, 0], [0, 0, 0], [0, 0, 0], stroke_opacity=0, fill_opacity=0)
         convex_hull.add_updater(draw_convex_hull)
-        self.play(
-            Create(convex_hull)
-        )
-        time_tracker.resume_updating()
+        self.add(convex_hull)
         self.wait(8)
 
         for _ in range(5):
@@ -566,20 +572,17 @@ class CollisionFixed(CollisionScene):
             temp_tracker.set_value(MAINTAIN)
             self.wait(4)
 
-        # # let the nucleus grow beyond the critical size
-        # growth_tracker.set_value(GROW_BEYOND_CRIT_SIZE)
-        #
-        # for _ in range(5):
-        #     temp_tracker.set_value(HEAT)
-        #     self.wait(1)
-        #
-        #     temp_tracker.set_value(MAINTAIN)
-        #     self.wait(4)
-        #
-        # self.wait(4)
-        #
-        # temp_tracker.set_value(COOL)
-        # self.wait(4)
+        # let the nucleus grow beyond the critical size
+        growth_tracker.set_value(GROW_BEYOND_CRIT_SIZE)
 
-        # temp_tracker.set_value(COOL)
-        # self.wait(15)
+        for _ in range(5):
+            temp_tracker.set_value(HEAT)
+            self.wait(1)
+
+            temp_tracker.set_value(MAINTAIN)
+            self.wait(4)
+
+        self.wait(4)
+
+        temp_tracker.set_value(COOL)
+        self.wait(4)
