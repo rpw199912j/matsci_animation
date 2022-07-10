@@ -57,10 +57,6 @@ class CollisionScene(Scene):
         self.add(self.space)
         # step the physics simulation in pymunk
         self.space.add_updater(_step)
-        # update the convex hull
-        self.add_updater(self._update_convex_hull)
-        # update the graph network
-        self.add_updater(self._update_cluster_graph)
 
     def add_body(self, body: Mobject):
         """Bodies refer to pymunk's object.
@@ -69,6 +65,13 @@ class CollisionScene(Scene):
         if body.body != self.space.space.static_body:
             self.space.space.add(body.body)
         self.space.space.add(body.shape)
+
+    @staticmethod
+    def get_body_collision_type(bod) -> int:
+        collision_type = list(bod.shapes)[0].collision_type
+        if collision_type == 10000:
+            collision_type = 0
+        return collision_type
 
     def make_rigid_body(
             self,
@@ -136,14 +139,10 @@ class CollisionScene(Scene):
             scale = max_speed / current_speed
             body.velocity = body.velocity * scale
 
-    def _simulate(self, b):
-        """Simulate the physics after each dt"""
-        # get the space
-        pymunk_space = self.space.space
-        # get the default collision handler
-        coll_handler = pymunk_space.add_default_collision_handler()
-        # set custom collision behavior
-        coll_handler.begin = self._begin
+    @staticmethod
+    def _simulate(b):
+        """Simulate the physics for each mobject"""
+        # get the position
         x, y = b.body.position
         # set color based on speed
         velocity_vec = b.body.velocity
@@ -161,12 +160,13 @@ class CollisionScene(Scene):
         elif temp_tracker.get_value() == COOL:
             b.body.apply_force_at_local_point(force=-0.03 * velocity_direction)
 
+    def _update_detach(self, dt):
         # set detachment behavior
         current_size = len(self.nuc_cluster)
 
         # set detachment probability before reaching the critical size
         if current_size < self.critical_size:
-            detachment_prob = 1 / (90 * 7)
+            detachment_prob = 0.2
         # set detachment probability after reaching the critical size
         else:
             # after reaching the critical size, turn off probabilistic detachment
@@ -174,7 +174,7 @@ class CollisionScene(Scene):
 
         # probabilistic detachment
         if rng.uniform(0, 1) <= detachment_prob:
-            self._detach(pymunk_space)
+            self._detach()
 
     def _get_convex_hull(self):
         """Update the convex hull of the nucleus"""
@@ -185,8 +185,7 @@ class CollisionScene(Scene):
             convex_hull = ConvexHull(nuc_cluster_pos)
             self.convex_vertices = convex_hull.vertices
             # convert from cluster index to the mobject index
-            self.convex_mob_indices = [list(nuc_cluster_bodies_lst[_].shapes)[0].collision_type
-                                       if list(nuc_cluster_bodies_lst[_].shapes)[0].collision_type != 10000 else 0
+            self.convex_mob_indices = [self.get_body_collision_type(nuc_cluster_bodies_lst[_])
                                        for _ in self.convex_vertices]
         return nuc_cluster_bodies_lst
 
@@ -208,10 +207,11 @@ class CollisionScene(Scene):
             # neighbor_pairs_raw = kd_tree.query_pairs(r=0.25)
             # neighbor_pairs_converted = [(nuc_cluster_indices[i1], nuc_cluster_indices[i2])
             #                             for i1, i2 in neighbor_pairs_raw]
-            # alternative edges from the pymunk constraint
+            # set all the pymunk constraints as the connecting edges
             all_constraints = self.space.space.constraints
             connecting_edges = [
-                (list(joint.a.shapes)[0].collision_type, list(joint.b.shapes)[0].collision_type)
+                (self.get_body_collision_type(joint.a),
+                 self.get_body_collision_type(joint.b))
                 for joint in all_constraints
             ]
 
@@ -223,21 +223,22 @@ class CollisionScene(Scene):
             cluster_graph.add_edges_from(connecting_edges)
             self.nuc_cluster_graph = cluster_graph
 
-    def _detach(self, pymunk_space):
+    def _detach(self):
+        pymunk_space = self.space.space
         # get the bodies in the nucleus cluster and right before detachment selection
         nuc_cluster_bodies_at_detach = self._get_convex_hull()
         if isinstance(self.convex_vertices, np.ndarray):
             # choose a random convex hull vertex
             vertex_selected_idx = rng.choice(a=self.convex_vertices)
             body_to_remove = nuc_cluster_bodies_at_detach[vertex_selected_idx]
-            cluster_remove_idx = list(body_to_remove.shapes)[0].collision_type
+            cluster_remove_idx = self.get_body_collision_type(body_to_remove)
             dist_to_core = body_to_remove.position.get_distance(self.anchor_pos)
             # get all the joints connected to the selected vertex
             body_selected_joints = body_to_remove.constraints
 
             # detach only when the particle to be removed is not the initial nucleation site,
             # and if it isn't, it should not be too close to the initial nucleation site
-            if (cluster_remove_idx not in {0, 10000}) and (dist_to_core > 0.24 * 2):
+            if (cluster_remove_idx != 0) and (dist_to_core > 0.24 * 2):
                 self.particle_mobs[cluster_remove_idx].set_color(PURPLE)
                 # remove the selected joint from the physics simulation
                 for joint in body_selected_joints:
@@ -257,8 +258,6 @@ class CollisionScene(Scene):
                 # apply a force in the outward radial direction of moving
                 v_dir = v_vec.normalized()
                 body_to_remove.apply_force_at_local_point(force=0.01 * v_dir)
-                # # update the convex hull after each detachment
-                # self._get_convex_hull()
 
     def _begin(self, arbiter, space, data):
         """Callback function to set attachment at a given probability upon collision"""
@@ -266,8 +265,8 @@ class CollisionScene(Scene):
         i1, i2 = s1.collision_type, s2.collision_type
         # set attachment behavior
         current_size = len(self.nuc_cluster)
-        # attach only when one of the two particles colliding is in the existing nucleus
-        if (i1 in self.nuc_cluster or i2 in self.nuc_cluster) and 10000 not in {i1, i2}:
+        # attach only when at least one of the two particles colliding is in the existing nucleus
+        if (len({i1, i2}.intersection(self.nuc_cluster)) >= 1) and 10000 not in {i1, i2}:
             # set attachment probability before reaching the critical size
             if current_size <= self.critical_size:
                 attachment_prob = 0.7
@@ -275,7 +274,7 @@ class CollisionScene(Scene):
             else:
                 attachment_prob = 0.7
 
-            if rng.uniform(0, 1) <= attachment_prob:
+            if (rng.uniform(0, 1) <= attachment_prob) and (not self.nuc_cluster_graph.has_edge(i1, i2)):
                 joint = pymunk.PinJoint(s1.body, s2.body)
                 space.add(joint)
                 self.nuc_cluster = self.nuc_cluster.union({i1, i2})
@@ -289,7 +288,7 @@ class CollisionScene(Scene):
                     timeout = time.time() + 2
                     while (len(self.nuc_cluster) > self.critical_size - rng.choice(a=3)) and (
                             growth_tracker.get_value() == MAINTAIN_CRIT_SIZE):
-                        self._detach(space)
+                        self._detach()
                         if time.time() > timeout:
                             break
         return True
@@ -323,6 +322,10 @@ class CollisionScene(Scene):
                 self.anchor_pos = mob.body.position
                 self.nuc_cluster = {collision_type}
                 self.nuc_cluster_bodies = {mob.body}
+                # get the default collision handler
+                coll_handler = self.space.space.add_default_collision_handler()
+                # set custom collision behavior
+                coll_handler.begin = self._begin
             self.add_body(mob)
 
     def stop_rigidity(self, *mobs: Mobject) -> None:
@@ -571,6 +574,12 @@ class CollisionFixedGL(CollisionScene):
             friction=0,
             collision_type=0
         )
+        # start updating the detachment behavior
+        self.add_updater(self._update_detach)
+        # start updating the convex hull
+        self.add_updater(self._update_convex_hull)
+        # start updating the graph network
+        self.add_updater(self._update_cluster_graph)
 
         for _, part in enumerate(particles[1:]):
             self.make_rigid_body(
@@ -610,28 +619,18 @@ class CollisionFixedGL(CollisionScene):
         convex_hull.add_updater(draw_convex_hull)
         self.add(convex_hull)
 
-        def draw_graph_network(graph, dt):
-            """Helper function to draw the convex hull"""
-            _ = dt
-            updated_networkx_graph = Graph.from_networkx(self.nuc_cluster_graph,
-                                                         layout={
-                                                             node: self.particle_mobs[node].get_center()
-                                                             for node in self.nuc_cluster_graph.nodes}
-                                                         ).get_group_class()
-            graph.become(updated_networkx_graph)
+        def draw_graph_network():
+            """Helper function to draw the nucleation cluster graph"""
+            return Graph.from_networkx(self.nuc_cluster_graph,
+                                       layout={
+                                           node: self.particle_mobs[node].get_center()
+                                           for node in self.nuc_cluster_graph.nodes}
+                                       )
 
         # draw the nucleation cluster graph
-        print("Before graph")
         cluster_graph = always_redraw(
-            lambda:
-            Graph.from_networkx(self.nuc_cluster_graph,
-                                layout={
-                                    node: self.particle_mobs[node].get_center()
-                                    for node in self.nuc_cluster_graph.nodes}
-                                )
+            draw_graph_network
         )
-        # cluster_graph.add_updater(draw_graph_network)
-        print("Updating graph")
         self.add(cluster_graph)
 
         # start the collision simulation
