@@ -201,20 +201,26 @@ class CollisionScene(Scene):
                                     for mob_idx in nuc_cluster_indices])
 
         if len(nuc_cluster_pos) > 0:
-            # create a KDTree for nearest neighbor lookup
-            kd_tree = KDTree(nuc_cluster_pos)
-            # get all pairs of particles that are within max_node_dist
-            # AHA: need to be careful about extra argument for updater function
-            neighbor_pairs_raw = kd_tree.query_pairs(r=0.25)
-            neighbor_pairs_converted = [(nuc_cluster_indices[i1], nuc_cluster_indices[i2])
-                                        for i1, i2 in neighbor_pairs_raw]
+            # # create a KDTree for nearest neighbor lookup
+            # kd_tree = KDTree(nuc_cluster_pos)
+            # # get all pairs of particles that are within max_node_dist
+            # # AHA: need to be careful about extra argument for updater function
+            # neighbor_pairs_raw = kd_tree.query_pairs(r=0.25)
+            # neighbor_pairs_converted = [(nuc_cluster_indices[i1], nuc_cluster_indices[i2])
+            #                             for i1, i2 in neighbor_pairs_raw]
+            # alternative edges from the pymunk constraint
+            all_constraints = self.space.space.constraints
+            connecting_edges = [
+                (list(joint.a.shapes)[0].collision_type, list(joint.b.shapes)[0].collision_type)
+                for joint in all_constraints
+            ]
 
             # initialize an empty graph
             cluster_graph = nx.Graph()
             # add the mobject index as nodes
             cluster_graph.add_nodes_from(nuc_cluster_indices)
             # add edges from neighbor_pairs
-            cluster_graph.add_edges_from(neighbor_pairs_converted)
+            cluster_graph.add_edges_from(connecting_edges)
             self.nuc_cluster_graph = cluster_graph
 
     def _detach(self, pymunk_space):
