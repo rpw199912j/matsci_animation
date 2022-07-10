@@ -202,14 +202,16 @@ class CollisionScene(Scene):
         sub_graph_to_return = sub_graphs.pop(0)
 
         # iterate through the remaining sub-graphs
+        constraints_to_remove = set()
         for sub_graph in sub_graphs:
             for node in sub_graph.nodes:
                 # remove the floating nucleation cluster particles
                 self.nuc_cluster.remove(node)
                 node_body = self.particle_mobs[node].body
                 self.nuc_cluster_bodies.remove(node_body)
-                # remove all joints associated with this body
-                self.space.space.remove(*node_body.constraints)
+                # add joints associated with this body to be removed
+                constraints_to_remove = constraints_to_remove.union(node_body.constraints)
+        self.space.space.remove(*constraints_to_remove)
         return sub_graph_to_return
 
     def _update_cluster_graph(self, dt):
@@ -652,7 +654,7 @@ class CollisionFixedGL(CollisionScene):
         cluster_graph = always_redraw(
             draw_graph_edges
         )
-        self.add(cluster_graph)
+        # self.add(cluster_graph)  # comment out to remove joint visualization
 
         # start the collision simulation
         self.wait(8)
