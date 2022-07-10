@@ -557,10 +557,15 @@ class CollisionFixed(CollisionScene):
                         color=YELLOW
                     ))
             else:
-                poly.become(Polygon([0, 0, 0], [0, 0, 0], [0, 0, 0], stroke_opacity=0, fill_opacity=0))
+                poly.become(Polygon(particles[0].get_center(),
+                                    particles[0].get_center(),
+                                    particles[0].get_center(),
+                                    stroke_opacity=0, fill_opacity=0))
 
         # draw the convex hull
-        convex_hull = Polygon([0, 0, 0], [0, 0, 0], [0, 0, 0], stroke_opacity=0, fill_opacity=0)
+        convex_hull = Polygon(particles[0].get_center(),
+                              particles[0].get_center(),
+                              particles[0].get_center(), stroke_opacity=0, fill_opacity=0)
         convex_hull.add_updater(draw_convex_hull)
         self.add(convex_hull)
         self.wait(8)
