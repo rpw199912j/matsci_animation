@@ -192,6 +192,26 @@ class CollisionScene(Scene):
     def _update_convex_hull(self, dt):
         self._get_convex_hull()
 
+    def _check_graph_connectivity(self, input_graph: nx.Graph) -> nx.Graph:
+        """Make sure all the particles in the nucleation cluster are connected"""
+        # get the components of a graph sorted in decreasing size
+        components = sorted(nx.connected_components(input_graph), key=len, reverse=True)
+        # generate the sub-graphs corresponding to each component
+        sub_graphs = [input_graph.subgraph(c).copy() for c in components]
+        # get the largest sub-graph
+        sub_graph_to_return = sub_graphs.pop(0)
+
+        # iterate through the remaining sub-graphs
+        for sub_graph in sub_graphs:
+            for node in sub_graph.nodes:
+                # remove the floating nucleation cluster particles
+                self.nuc_cluster.remove(node)
+                node_body = self.particle_mobs[node].body
+                self.nuc_cluster_bodies.remove(node_body)
+                # remove all joints associated with this body
+                self.space.space.remove(*node_body.constraints)
+        return sub_graph_to_return
+
     def _update_cluster_graph(self, dt):
         # create an ordered list of the nucleation cluster indices
         nuc_cluster_indices = list(self.nuc_cluster)
@@ -221,7 +241,9 @@ class CollisionScene(Scene):
             cluster_graph.add_nodes_from(nuc_cluster_indices)
             # add edges from neighbor_pairs
             cluster_graph.add_edges_from(connecting_edges)
-            self.nuc_cluster_graph = cluster_graph
+            # check the connectivity of the graph
+            cluster_graph_checked = self._check_graph_connectivity(cluster_graph)
+            self.nuc_cluster_graph = cluster_graph_checked
 
     def _detach(self):
         pymunk_space = self.space.space
@@ -240,19 +262,12 @@ class CollisionScene(Scene):
             # and if it isn't, it should not be too close to the initial nucleation site
             if (cluster_remove_idx != 0) and (dist_to_core > 0.24 * 2):
                 self.particle_mobs[cluster_remove_idx].set_color(PURPLE)
-                # remove the selected joint from the physics simulation
-                for joint in body_selected_joints:
-                    try:
-                        pymunk_space.remove(joint)
-                    # TODO: temporary fix, need to look into why the same joint is removed more than once
-                    except AssertionError:
-                        continue
+                # remove the joint associated with the body selected from the physics simulation
+                pymunk_space.remove(*body_selected_joints)
 
-                try:
-                    self.nuc_cluster.remove(cluster_remove_idx)
-                    self.nuc_cluster_bodies.remove(body_to_remove)
-                except KeyError:
-                    pass
+                # remove the body from the nucleation cluster
+                self.nuc_cluster.remove(cluster_remove_idx)
+                self.nuc_cluster_bodies.remove(body_to_remove)
                 # get the outward radial direction
                 v_vec = body_to_remove.position - self.anchor_pos
                 # apply a force in the outward radial direction of moving
@@ -576,10 +591,10 @@ class CollisionFixedGL(CollisionScene):
         )
         # start updating the detachment behavior
         self.add_updater(self._update_detach)
-        # start updating the convex hull
-        self.add_updater(self._update_convex_hull)
         # start updating the graph network
         self.add_updater(self._update_cluster_graph)
+        # start updating the convex hull
+        self.add_updater(self._update_convex_hull)
 
         for _, part in enumerate(particles[1:]):
             self.make_rigid_body(
@@ -619,7 +634,7 @@ class CollisionFixedGL(CollisionScene):
         convex_hull.add_updater(draw_convex_hull)
         self.add(convex_hull)
 
-        def draw_graph_network():
+        def get_graph_network():
             """Helper function to draw the nucleation cluster graph"""
             return Graph.from_networkx(self.nuc_cluster_graph,
                                        layout={
@@ -627,9 +642,15 @@ class CollisionFixedGL(CollisionScene):
                                            for node in self.nuc_cluster_graph.nodes}
                                        )
 
+        def draw_graph_edges():
+            """Helper function to draw the nucleation cluster edges"""
+            graph = get_graph_network()
+            graph_edges = VGroup(*graph.edges.values())
+            return graph_edges
+
         # draw the nucleation cluster graph
         cluster_graph = always_redraw(
-            draw_graph_network
+            draw_graph_edges
         )
         self.add(cluster_graph)
 
@@ -663,4 +684,20 @@ class OpenGLTest(Scene):
     def construct(self):
         circ = Circle(point=LEFT, radius=1, stroke_width=10, fill_color=YELLOW, fill_opacity=1)
         self.play(DrawBorderThenFill(circ))
+        self.wait(10)
+
+
+class LabeledModifiedGraph(Scene):
+    def construct(self):
+        vertices = [1, 2, 3, 4, 5, 6, 7, 8]
+        edges = [(1, 7), (1, 8), (2, 3), (2, 4), (2, 5),
+                 (2, 8), (3, 4), (6, 1), (6, 2),
+                 (6, 3), (7, 2), (7, 4)]
+        g = Graph(vertices, edges, layout="circular", layout_scale=3,
+                  labels=True, vertex_config={7: {"fill_color": RED}},
+                  edge_config={(1, 7): {"stroke_color": RED},
+                               (2, 7): {"stroke_color": RED},
+                               (4, 7): {"stroke_color": RED}})
+        print(VGroup(*g.edges.values()))
+        self.add(VGroup(*g.edges.values()))
         self.wait(10)
