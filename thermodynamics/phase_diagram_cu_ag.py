@@ -18,8 +18,17 @@ class CuAgPhaseDiagram(Scene):
     def __init__(self):
         super().__init__()
         self.gibbs_df = pd.read_csv("../data/gibbs_energy/binary_Cu_Ag_mass_normalized.csv")
+        self.paths = [
+            [],  # alpha solidus
+            [],  # alpha liquidus
+            [],  # beta liquidus
+            [],  # beta solidus
+            [],  # alpha solvus
+            []  # beta solvus
+        ]
 
-    def extract_gibbs_data(self, input_df, phase_name: str) -> tuple:
+    @staticmethod
+    def extract_gibbs_data(input_df, phase_name: str) -> tuple:
         """Extract the x, y data for a gibbs curve"""
         # get the x, y values for the given phase
         data_df = input_df[input_df["phase"] == phase_name]
@@ -123,6 +132,42 @@ class CuAgPhaseDiagram(Scene):
         common_tangent_coords = [[*all_coords[_]] for _ in common_tangent_indices_flatten]
         return common_tangent_coords
 
+    @staticmethod
+    def draw_phase_diagram_point(coord, ax, current_temp):
+        if coord is None:
+            return Dot().set_opacity(0)
+
+        coord[1] = current_temp
+
+        return Dot(
+            point=ax.c2p(*coord)
+        )
+
+    @staticmethod
+    def draw_phase_diagram_bound(path, ax):
+        if not path:
+            return Dot().set_opacity(0)
+        # if not empty, draw the path
+        path_arr = np.array(path)
+        bound_path = ax.plot_line_graph(
+            x_values=path_arr[:, 0],
+            y_values=path_arr[:, 1],
+            line_color=WHITE,
+            add_vertex_dots=False,
+            stroke_width=2
+        )["line_graph"]
+
+        return bound_path
+
+    @staticmethod
+    def draw_tangent_point(coord, ax):
+        if coord is None:
+            return Dot().set_opacity(0)
+
+        return Dot(
+            point=ax.c2p(*coord)
+        )
+
     def construct(self):
         # create two axes, one for G-X and one for T-X
         g_x_axes = Axes(
@@ -161,15 +206,6 @@ class CuAgPhaseDiagram(Scene):
         temps = self.gibbs_df["temp"].unique()[::-1]
 
         current_temp = temps[0]
-        # fcc_curve, liquid_curve = self.get_relevant_mobjects(current_temp, g_x_axes)
-        # self.play(
-        #     LaggedStart(
-        #         Create(fcc_curve),
-        #         Create(liquid_curve),
-        #         lag_ratio=0.3
-        #     )
-        # )
-        # self.wait()
         temp_tracker = ValueTracker(current_temp)
 
         def get_all_mobjects():
@@ -178,8 +214,6 @@ class CuAgPhaseDiagram(Scene):
 
             fcc_spline_fit = CubicSpline(fcc_x_arr, fcc_y_arr)
             liquid_spline_fit = CubicSpline(liquid_x_arr, liquid_y_arr)
-            fcc_slope_func = fcc_spline_fit.derivative()
-            liquid_slope_func = liquid_spline_fit.derivative()
 
             fcc_phase_curve = g_x_axes.plot(
                 lambda x: fcc_spline_fit(x),
@@ -199,18 +233,11 @@ class CuAgPhaseDiagram(Scene):
             # get the number of intersections
             num_intersections = (np.diff(diff_y_vals > 0) != 0).sum()
 
-            # define a few systems of equations to solve the common tangent points
-            # find the common tangent points between FCC and LIQUID
-            def common_tangent_fcc_liquid(x):
-                """Systems of non-linear functions to solve for the common tangent points"""
-                return [fcc_slope_func(x[0]) - liquid_slope_func(x[1]),
-                        (liquid_spline_fit(x[1]) - fcc_spline_fit(x[0])) / (x[1] - x[0]) - fcc_slope_func(x[0])]
-
-            # find the common tangent points between FCC and FCC itself
-            def common_tangent_fcc_only(x):
-                """Systems of non-linear functions to solve for the common tangent points"""
-                return [fcc_slope_func(x[0]) - fcc_slope_func(x[1]),
-                        (fcc_spline_fit(x[1]) - fcc_spline_fit(x[0])) / (x[1] - x[0]) - fcc_slope_func(x[0])]
+            # get the common tangent points via convex hull construction
+            common_tangents = self.get_common_tangent_points(fcc_spline_fit, liquid_spline_fit)
+            alpha_solidus, alpha_liquidus, beta_liquidus, beta_solidus, alpha_solvus, beta_solvus = (
+                None, None, None, None, None, None
+            )
 
             # if the fcc curve is above the liquid curve in the entire x range,
             # there is no intersection and only liquid phase
@@ -218,43 +245,85 @@ class CuAgPhaseDiagram(Scene):
                 print(f"\nOnly liquid @{temp_tracker.get_value()}")
             elif num_intersections == 1:
                 print(f"\nOne intersection @{temp_tracker.get_value()}")
-                # get the x, y coordinates of the tangent points
-                fcc_tangent_x, liquid_tangent_x = fsolve(common_tangent_fcc_liquid, [0.05, 0.1])
-                fcc_tangent_y, liquid_tangent_y = fcc_spline_fit(fcc_tangent_x), liquid_spline_fit(liquid_tangent_x)
-                print(f"\ntangent 1: {fcc_tangent_x, fcc_tangent_y}; tangent 2: {liquid_tangent_x, liquid_tangent_y}")
+                alpha_solidus, alpha_liquidus = common_tangents
             elif num_intersections == 2:
                 print(f"\nTwo intersections @{temp_tracker.get_value()}")
-                # get the x, y coordinates of the tangent points
-                fcc_tangent_x_1, liquid_tangent_x_1 = fsolve(common_tangent_fcc_liquid, [0.05, 0.1])
-                fcc_tangent_y_1, liquid_tangent_y_1 = fcc_spline_fit(fcc_tangent_x_1), liquid_spline_fit(liquid_tangent_x_1)
-                print(f"\ntangent 1: {fcc_tangent_x_1, fcc_tangent_y_1}; tangent 2: {liquid_tangent_x_1, liquid_tangent_y_1}")
+                # when there are 4 common tangent points
+                if len(common_tangents) == 4:
+                    alpha_solidus, alpha_liquidus, beta_liquidus, beta_solidus = common_tangents
+                    # check if the alpha_liquidus and beta_liquidus is close enough
+                    if np.isclose(alpha_liquidus[0], beta_liquidus[0], atol=0.001):
+                        # add the eutectic line
+                        left_end = [alpha_solidus[0], temp_tracker.get_value()]
+                        right_end = [beta_solidus[0], temp_tracker.get_value()]
+                        eutectic_line = Line(
+                            start=t_x_axes.c2p(*left_end),
+                            end=t_x_axes.c2p(*right_end),
+                            color=WHITE,
+                            stroke_width=2
+                        )
+                        self.add(eutectic_line)
+                        self.paths[-2].append(left_end)
+                        self.paths[-1].append(right_end)
+                # when there are 2 common tangent points (only FCC phase)
+                elif len(common_tangents) == 2:
+                    alpha_solvus, beta_solvus = common_tangents
 
-                # get the x, y coordinates of the tangent points
-                fcc_tangent_x_2, liquid_tangent_x_2 = fsolve(common_tangent_fcc_liquid, [0.9, 0.95])
-                fcc_tangent_y_2, liquid_tangent_y_2 = fcc_spline_fit(fcc_tangent_x_2), liquid_spline_fit(
-                    liquid_tangent_x_2)
-                print(
-                    f"\ntangent 3: {fcc_tangent_x_2, fcc_tangent_y_2}; tangent 4: {liquid_tangent_x_2, liquid_tangent_y_2}")
             elif sum(diff_y_vals < 0) == len(diff_y_vals):
                 print(f"\nOnly fcc @{temp_tracker.get_value()}")
+                alpha_solvus, beta_solvus = common_tangents
 
-                # get the x, y coordinates of the tangent points
-                fcc_tangent_x_1, fcc_tangent_x_2 = fsolve(common_tangent_fcc_only, [0.05, 0.95])
-                fcc_tangent_y_1, fcc_tangent_y_2 = fcc_spline_fit(fcc_tangent_x_1), fcc_spline_fit(fcc_tangent_x_2)
-                print(f"\ntangent 1: {fcc_tangent_x_1, fcc_tangent_y_1}; tangent 2: {fcc_tangent_x_2, fcc_tangent_y_2}")
+            updated_points = [alpha_solidus, alpha_liquidus, beta_liquidus, beta_solidus, alpha_solvus, beta_solvus]
+
+            tangent_points = [
+                self.draw_tangent_point(_, g_x_axes)
+                for _ in updated_points
+            ]
+
+            phase_diagram_points = [
+                self.draw_phase_diagram_point(_, t_x_axes, temp_tracker.get_value())
+                for _ in updated_points
+            ]
+
+            connecting_vlines = [
+                DashedLine(
+                    start=g_x_point,
+                    end=t_x_point,
+                    stroke_width=2,
+                    color=WHITE
+                )
+                for g_x_point, t_x_point in zip(tangent_points, phase_diagram_points)
+            ]
+
+            for path, point in zip(self.paths, updated_points):
+                # only add point coordinate when it exists (i.e., not None)
+                if point is not None:
+                    point[1] = temp_tracker.get_value()
+                    path.append(point)
+
+            phase_diagram_bounds = [
+                self.draw_phase_diagram_bound(_, t_x_axes)
+                for _ in self.paths
+            ]
 
             return VGroup(
-                fcc_phase_curve, liquid_phase_curve
+                fcc_phase_curve, liquid_phase_curve,
+                *tangent_points, *phase_diagram_points,
+                *connecting_vlines,
+                *phase_diagram_bounds
             )
 
         all_mobs = always_redraw(get_all_mobjects)
 
+        # TODO: investigating adding an always-updating VGroup and the creation with subgroups
         self.play(
             LaggedStart(
-                Create(all_mobs),
+                Create(all_mobs[0]),
+                Create(all_mobs[1]),
                 lag_ratio=0.3
             )
         )
+        self.add(all_mobs)
         self.wait()
 
         temp_hline = always_redraw(
@@ -274,12 +343,10 @@ class CuAgPhaseDiagram(Scene):
             temp_tracker.animate(rate_func=linear, run_time=5).set_value(temps[-1])
         )
         self.wait()
+        all_mobs.clear_updaters()
 
-        # for current_temp in temps[1:]:
-        #     current_fcc_curve, current_liquid_curve = self.get_relevant_mobjects(current_temp, g_x_axes)
-        #     self.play(
-        #         Transform(fcc_curve, current_fcc_curve),
-        #         Transform(liquid_curve, current_liquid_curve),
-        #         temp_tracker.animate.set_value(current_temp),
-        #         rate_func=linear
-        #     )
+        # highlight different phase boundaries
+        self.play(
+            Indicate(all_mobs[-1])
+        )
+        self.wait()
