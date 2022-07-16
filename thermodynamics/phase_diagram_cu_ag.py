@@ -136,11 +136,9 @@ class CuAgPhaseDiagram(Scene):
     def draw_phase_diagram_point(coord, ax, current_temp):
         if coord is None:
             return Dot().set_opacity(0)
-
-        coord[1] = current_temp
-
+        # AHA: be aware of object reference and modifying list in-place
         return Dot(
-            point=ax.c2p(*coord)
+            point=ax.c2p(coord[0], current_temp)
         )
 
     @staticmethod
@@ -167,6 +165,29 @@ class CuAgPhaseDiagram(Scene):
         return Dot(
             point=ax.c2p(*coord)
         )
+
+    @staticmethod
+    def get_line(point_left, point_right, ax):
+        if point_left is None or point_right is None:
+            return Dot().set_opacity(0)
+
+        # unpack the coordinates
+        x1, y1 = point_left
+        x2, y2 = point_right
+
+        # calculate the slope and the intercept
+        m = (y2 - y1) / (x2 - x1)
+        b = y1 - m * x1
+
+        # get the common tangent line
+        tangent_line = DashedVMobject(
+            vmobject=ax.plot(
+                lambda x: m * x + b,
+                color=WHITE,
+                stroke_width=2, stroke_opacity=0.5
+            )
+        )
+        return tangent_line
 
     def construct(self):
         # create two axes, one for G-X and one for T-X
@@ -295,6 +316,16 @@ class CuAgPhaseDiagram(Scene):
                 for g_x_point, t_x_point in zip(tangent_points, phase_diagram_points)
             ]
 
+            # construct the common tangent lines
+            common_tangent_lines = [
+                self.get_line(point_1, point_2, g_x_axes)
+                for point_1, point_2 in [
+                    (alpha_solidus, alpha_liquidus),
+                    (beta_liquidus, beta_solidus),
+                    (alpha_solvus, beta_solvus)
+                ]
+            ]
+
             for path, point in zip(self.paths, updated_points):
                 # only add point coordinate when it exists (i.e., not None)
                 if point is not None:
@@ -309,6 +340,7 @@ class CuAgPhaseDiagram(Scene):
             return VGroup(
                 fcc_phase_curve, liquid_phase_curve,
                 *tangent_points, *phase_diagram_points,
+                *common_tangent_lines,
                 *connecting_vlines,
                 *phase_diagram_bounds
             )
