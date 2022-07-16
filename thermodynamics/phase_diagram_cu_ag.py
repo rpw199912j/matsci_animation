@@ -1,3 +1,4 @@
+import math
 import numpy as np
 import pandas as pd
 
@@ -18,6 +19,7 @@ class CuAgPhaseDiagram(Scene):
     def __init__(self):
         super().__init__()
         self.gibbs_df = pd.read_csv("../data/gibbs_energy/binary_Cu_Ag_mass_normalized.csv")
+        self.g_x_axes = None
         self.paths = [
             [],  # alpha solidus
             [],  # alpha liquidus
@@ -248,17 +250,65 @@ class CuAgPhaseDiagram(Scene):
                    for phase_bound, c in zip(phase_bounds, phase_bound_colors)]
         return regions
 
+    @staticmethod
+    def plot_phase_curve(spline_fit, ax, stroke_color):
+        return ax.plot(
+            lambda x: spline_fit(x),
+            color=stroke_color, x_range=(ax.x_range[0], ax.x_range[1], 1e-3), use_smoothing=False
+        )
+
     def construct(self):
+        # get all the temperature in descending order
+        temps = self.gibbs_df["temp"].unique()[::-1]
+
+        current_temp = temps[0]
+        temp_tracker = ValueTracker(current_temp)
+
         # create two axes, one for G-X and one for T-X
-        g_x_axes = Axes(
-            x_range=[0, 1, 0.1],
-            y_range=[-1300, -300, 200],
-            x_length=8,
-            y_length=8,
-            tips=False,
-            axis_config={"include_numbers": True},
-            x_axis_config={"label_direction": UP}
-        ).shift(UP * 4.5)
+        def get_g_axes():
+            _, fcc_y_vals = self.interpolate_gibbs_data(temp_tracker.get_value(), "FCC")
+            _, liquid_y_vals = self.interpolate_gibbs_data(temp_tracker.get_value(), "LIQUID")
+            all_y_vals = np.append(fcc_y_vals, liquid_y_vals)
+            y_offset = 50
+            y_min, y_max = np.min(all_y_vals) - y_offset, np.max(all_y_vals) + y_offset
+            print(y_min, y_max)
+
+            # get the nearest 50 factors below the y_min
+            y_10s_min = math.floor(y_min / 50) * 50
+            # get the nearest 50 factors above the y_max
+            y_10s_max = int(y_max / 50) * 50
+            print(y_10s_min, y_10s_max)
+            # get the all the numbers that are multipliers of 50 in [y_min, y_max]
+            y_tick_vals = np.arange(y_10s_min, y_10s_max + 50, 50, dtype=int)
+            y_tick_vals = y_tick_vals[np.logical_and(y_tick_vals >= y_min, y_tick_vals <= y_max)]
+            print(y_tick_vals)
+
+            ax = Axes(
+                x_range=[0, 1, 0.1],
+                y_range=[y_min, y_max, y_max - y_min],
+                x_length=8,
+                y_length=8,
+                tips=False,
+                y_axis_config={"include_ticks": False, "numbers_to_include": y_tick_vals,
+                               "decimal_number_config": {"num_decimal_places": 0}},
+                x_axis_config={"label_direction": UP, "include_numbers": True}
+            ).shift(UP * 4.5)
+
+            # add custom ticks
+            ax_y_axis = ax.y_axis
+            ticks = VGroup()
+            for _ in y_tick_vals:
+                ticks.add(ax_y_axis.get_tick(_, ax_y_axis.tick_size))
+            ax_y_axis.add(ticks)
+            ax_y_axis.ticks = ticks
+
+            self.g_x_axes = ax
+            return ax
+
+        g_x_axes = always_redraw(
+            get_g_axes
+        )
+
         g_y_axis_label = g_x_axes.get_y_axis_label(
             Tex(r"Gibbs Energy (J/g)").rotate(PI / 2)
         ).next_to(g_x_axes.y_axis, LEFT)
@@ -282,12 +332,6 @@ class CuAgPhaseDiagram(Scene):
         self.add(g_x_axes, t_x_axes, g_y_axis_label, t_x_axis_label, t_y_axis_label)
         self.wait()
 
-        # get all the temperature in descending order
-        temps = self.gibbs_df["temp"].unique()[::-1]
-
-        current_temp = temps[0]
-        temp_tracker = ValueTracker(current_temp)
-
         def get_all_mobjects():
             fcc_x_arr, fcc_y_arr = self.interpolate_gibbs_data(temp_tracker.get_value(), "FCC")
             liquid_x_arr, liquid_y_arr = self.interpolate_gibbs_data(temp_tracker.get_value(), "LIQUID")
@@ -295,15 +339,22 @@ class CuAgPhaseDiagram(Scene):
             fcc_spline_fit = CubicSpline(fcc_x_arr, fcc_y_arr)
             liquid_spline_fit = CubicSpline(liquid_x_arr, liquid_y_arr)
 
-            fcc_phase_curve = g_x_axes.plot(
-                lambda x: fcc_spline_fit(x),
-                color=ORANGE, x_range=(g_x_axes.x_range[0], g_x_axes.x_range[1], 1e-3), use_smoothing=False
+            # fcc_phase_curve = g_x_axes.plot(
+            #     lambda x: fcc_spline_fit(x),
+            #     color=ORANGE, x_range=(g_x_axes.x_range[0], g_x_axes.x_range[1], 1e-3), use_smoothing=False
+            # )
+            fcc_phase_curve = self.plot_phase_curve(
+                fcc_spline_fit, self.g_x_axes, ORANGE
             )
 
-            liquid_phase_curve = g_x_axes.plot(
-                lambda x: liquid_spline_fit(x),
-                color=BLUE, x_range=(g_x_axes.x_range[0], g_x_axes.x_range[1], 1e-3), use_smoothing=False
+            # liquid_phase_curve = g_x_axes.plot(
+            #     lambda x: liquid_spline_fit(x),
+            #     color=BLUE, x_range=(g_x_axes.x_range[0], g_x_axes.x_range[1], 1e-3), use_smoothing=False
+            # )
+            liquid_phase_curve = self.plot_phase_curve(
+                liquid_spline_fit, self.g_x_axes, BLUE
             )
+
             # determine the number of intersections between the fcc and liquid curves
             detect_intersect_range = np.arange(0, 1 + 1e-6, 1e-6)
             fcc_y_vals = fcc_spline_fit(detect_intersect_range)
@@ -356,7 +407,7 @@ class CuAgPhaseDiagram(Scene):
             updated_points = [alpha_solidus, alpha_liquidus, beta_liquidus, beta_solidus, alpha_solvus, beta_solvus]
 
             tangent_points = [
-                self.draw_tangent_point(_, g_x_axes)
+                self.draw_tangent_point(_, self.g_x_axes)
                 for _ in updated_points
             ]
 
@@ -377,7 +428,7 @@ class CuAgPhaseDiagram(Scene):
 
             # construct the common tangent lines
             common_tangent_lines = [
-                self.get_line(point_1, point_2, g_x_axes)
+                self.get_line(point_1, point_2, self.g_x_axes)
                 for point_1, point_2 in [
                     (alpha_solidus, alpha_liquidus),
                     (beta_liquidus, beta_solidus),
@@ -431,10 +482,11 @@ class CuAgPhaseDiagram(Scene):
         self.wait()
 
         self.play(
-            temp_tracker.animate(rate_func=linear, run_time=5).set_value(temps[-1])
+            temp_tracker.animate(rate_func=linear, run_time=10).set_value(temps[-1])
         )
         self.wait()
         all_mobs.clear_updaters()
+        g_x_axes.clear_updaters()
         # remove visual clutter
         self.play(
             *[Uncreate(mob) for mob in all_mobs[2:-6]]
