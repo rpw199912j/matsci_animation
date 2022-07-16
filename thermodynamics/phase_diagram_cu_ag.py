@@ -189,6 +189,65 @@ class CuAgPhaseDiagram(Scene):
         )
         return tangent_line
 
+    @staticmethod
+    def make_phase_bound(arr_1, arr_2, extra_points=None, reverse_2nd=False):
+        arr_3 = []
+        if extra_points:
+            arr_3 = extra_points
+        if reverse_2nd:
+            arr_2 = arr_2[::-1]
+
+        phase_bound = arr_1 + arr_2 + arr_3
+        return phase_bound
+
+    @staticmethod
+    def get_poly(phase_bound, ax, **kwargs):
+        # convert the phase boundary array into the ax basis
+        ax_coords = [
+            ax.c2p(*coords) for coords in phase_bound
+        ]
+        return Polygon(
+            *ax_coords,
+            fill_opacity=0,
+            **kwargs
+        )
+
+    def get_phase_regions(self, ax):
+        alpha_fcc = self.make_phase_bound(
+            self.paths[0], self.paths[4],
+            extra_points=[[ax.x_range[0], ax.y_range[0]]]
+        )
+        alpha_fcc_liquid = self.make_phase_bound(
+            self.paths[0], self.paths[1],
+            reverse_2nd=True
+        )
+        liquid = self.make_phase_bound(
+            self.paths[1], self.paths[2],
+            extra_points=[[ax.x_range[1], ax.y_range[1]],
+                          [ax.x_range[0], ax.y_range[1]]],
+            reverse_2nd=True
+        )
+        beta_fcc_liquid = self.make_phase_bound(
+            self.paths[2], self.paths[3],
+            reverse_2nd=True
+        )
+        beta_fcc = self.make_phase_bound(
+            self.paths[3], self.paths[5],
+            extra_points=[[ax.x_range[1], ax.y_range[0]]]
+        )
+        alpha_beta_fcc = self.make_phase_bound(
+            self.paths[4], self.paths[5],
+            reverse_2nd=True
+        )
+        phase_bounds = [alpha_fcc, alpha_fcc_liquid, liquid,
+                        beta_fcc_liquid, beta_fcc, alpha_beta_fcc]
+        # phase_bound_colors = [ORANGE, GREEN, BLUE,
+        #                       YELLOW, LIGHT_BROWN, PURPLE]
+        phase_bound_colors = [WHITE] * len(phase_bounds)
+        regions = [self.get_poly(phase_bound, ax, color=c)
+                   for phase_bound, c in zip(phase_bounds, phase_bound_colors)]
+        return regions
+
     def construct(self):
         # create two axes, one for G-X and one for T-X
         g_x_axes = Axes(
@@ -376,9 +435,35 @@ class CuAgPhaseDiagram(Scene):
         )
         self.wait()
         all_mobs.clear_updaters()
-
-        # highlight different phase boundaries
+        # remove visual clutter
         self.play(
-            Indicate(all_mobs[-1])
+            *[Uncreate(mob) for mob in all_mobs[2:-6]]
         )
+        self.wait()
+
+        # highlight different phase regions
+        phase_regions = self.get_phase_regions(t_x_axes)
+        phase_labels = [r"\alpha", r"\alpha+L", "L",
+                        r"L+\beta", r"\beta", r"\alpha+\beta"]
+        label_positions = [[0.04, 810], [0.23, 880], [0.5, 1030],
+                           [0.86, 800], [0.96, 780], [0.5, 640]]
+        font_sizes = [DEFAULT_FONT_SIZE, DEFAULT_FONT_SIZE, DEFAULT_FONT_SIZE,
+                      0.7 * DEFAULT_FONT_SIZE, DEFAULT_FONT_SIZE, DEFAULT_FONT_SIZE]
+        for label, label_pos, fontsize, phase_region in zip(phase_labels, label_positions, font_sizes, phase_regions):
+            phase_region_label = MathTex(label, font_size=fontsize).move_to(
+                t_x_axes.c2p(*label_pos)
+            )
+            phase_region = VGroup(phase_region, phase_region_label)
+            target_phase_region = phase_region.copy().scale(1.2)
+            target_phase_region[0].set_color(YELLOW).set_fill(opacity=0.6)
+            final_phase_region = phase_region.copy()
+            phase_region.set_opacity(0)
+            self.play(
+                Succession(
+                    Transform(phase_region, target_phase_region, run_time=1),
+                    Wait(run_time=0.2),
+                    Transform(phase_region, final_phase_region, run_time=0.5)
+                ),
+                rate_func=smooth
+            )
         self.wait()
