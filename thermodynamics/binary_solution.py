@@ -489,6 +489,21 @@ class Simplex:
     def bary_to_cart(self, bary_coords):
         return np.dot(bary_coords, self.augmented_matrix[:, :-1])
 
+    @staticmethod
+    def sample_between_bary_coords(b1, b2, n=31):
+        dc_vec = b2 - b1
+        vec_increment = dc_vec / (n - 1)
+        sample_points_initial = np.repeat([b1], n, axis=0)
+        sample_points_addition = np.multiply(np.repeat([vec_increment], n, axis=0),
+                                             np.arange(0, n)[:, np.newaxis])
+        return sample_points_initial + sample_points_addition
+
+    @staticmethod
+    def get_point_between(b1, b2, frac):
+        """Get a point in between b1 and b2 with its distance to b1 as frac * (b2-b1)"""
+        dc_vec = b2 - b1
+        return b1 + frac * dc_vec
+
 
 # simplex = Simplex(
 #     [[0, 0],  # Component A
@@ -975,14 +990,184 @@ class TernarySolution(ThreeDScene):
         )
         self.wait()
 
-        rotation_time = 5
-        for _ in range(3):
-            self.begin_ambient_camera_rotation(
-                rate=120 / rotation_time * DEGREES
+        def get_cross_section(u_range, v_range):
+            cross_section_coords = np.array([
+                gibbs_surface_3.get_cart_coord(u, v)
+                for u, v in zip(u_range, v_range)
+            ])
+
+            cross_section = axes_3d.plot_line_graph(
+                x_values=cross_section_coords[:, 0],
+                y_values=cross_section_coords[:, 1],
+                z_values=cross_section_coords[:, 2],
+                add_vertex_dots=False
+            )["line_graph"]
+            return cross_section
+
+        # get two endpoint trackers on the perimeter of the ternary base
+        endpoint_tracker_1 = ValueTracker(3)
+        endpoint_tracker_2 = ValueTracker(1)
+
+        def convert_linear_to_bary(val, simplex: Simplex):
+            """Convert from a linear scale in [0, 3] to a barycentric coordinate along the perimeter"""
+            vertex_1, vertex_2 = None, None
+            val_frac = 0
+            if val <= 1:
+                vertex_1, vertex_2 = np.array([1, 0, 0]), np.array([0, 1, 0])
+                val_frac = val
+            elif val <= 2:
+                vertex_1, vertex_2 = np.array([0, 1, 0]), np.array([0, 0, 1])
+                val_frac = val - 1
+            elif val <= 3:
+                vertex_1, vertex_2 = np.array([0, 0, 1]), np.array([1, 0, 0])
+                val_frac = val - 2
+            else:
+                return convert_linear_to_bary(val % 3, simplex)
+
+            bary_coord = simplex.get_point_between(
+                b1=vertex_1,
+                b2=vertex_2,
+                frac=val_frac
             )
-            self.wait(rotation_time)
-            self.stop_ambient_camera_rotation()
-            self.wait()
+            return bary_coord
+
+        # take a vertical slice
+        def get_vert_slice():
+            """Draw the slice on the Gibbs surface"""
+            simplex_for_slice = gibbs_surface_3.simplex
+            # get the two endpoints
+            endpoint_1 = convert_linear_to_bary(endpoint_tracker_1.get_value(), simplex_for_slice)
+            endpoint_2 = convert_linear_to_bary(endpoint_tracker_2.get_value(), simplex_for_slice)
+
+            # sample along two barycentric coordinates
+            sample_points = simplex_for_slice.sample_between_bary_coords(
+                b1=endpoint_1,
+                b2=endpoint_2
+            )
+            # extract the u,v values
+            u_range, v_range = sample_points[:, 0], sample_points[:, 1]
+
+            cross_section = get_cross_section(u_range, v_range)
+            return cross_section
+
+        def get_slice_plane():
+            simplex_for_slice = gibbs_surface_3.simplex
+            # get the two endpoints on the barycentric base
+            endpoint_1 = convert_linear_to_bary(endpoint_tracker_1.get_value(), simplex_for_slice)
+            endpoint_2 = convert_linear_to_bary(endpoint_tracker_2.get_value(), simplex_for_slice)
+
+            # get the 4 corners of a slice plane
+            corner_bottom_left = axes_3d.c2p(
+                *gibbs_surface_3.get_cart_coord(*endpoint_1[:2])[:2], z_min
+            )
+            corner_bottom_right = axes_3d.c2p(
+                *gibbs_surface_3.get_cart_coord(*endpoint_2[:2])[:2], z_min
+            )
+            corner_upper_left = axes_3d.c2p(
+                *gibbs_surface_3.get_cart_coord(*endpoint_1[:2])[:2], z_max
+            )
+            corner_upper_right = axes_3d.c2p(
+                *gibbs_surface_3.get_cart_coord(*endpoint_2[:2])[:2], z_max
+            )
+
+            # create the slice plane
+            slice_plane = ThreeDVMobject(
+                color=WHITE, fill_opacity=0.1
+            )
+            slice_plane_corners = [corner_bottom_left,
+                                   corner_upper_left,
+                                   corner_upper_right,
+                                   corner_bottom_right,
+                                   corner_bottom_left]
+            slice_plane.set_points_as_corners(slice_plane_corners)
+            return slice_plane
+
+        vert_slice = always_redraw(
+            get_vert_slice
+        )
+        vert_slice_plane = always_redraw(
+            get_slice_plane
+        )
+        self.play(
+            DrawBorderThenFill(vert_slice_plane)
+        )
+        self.play(
+            Create(vert_slice)
+        )
+        self.wait()
+        self.add(vert_slice.copy().clear_updaters())
+
+        rotation_time = 5
+        # first rotation from ab to bc
+        self.begin_ambient_camera_rotation(
+            rate=120 / rotation_time * DEGREES
+        )
+        self.play(
+            endpoint_tracker_1.animate.set_value(2),
+            run_time=rotation_time
+        )
+        self.stop_ambient_camera_rotation()
+        self.add(vert_slice.copy().clear_updaters())
+        self.wait()
+
+        # second rotation from bc to ac
+        self.begin_ambient_camera_rotation(
+            rate=120 / rotation_time * DEGREES
+        )
+        self.play(
+            endpoint_tracker_2.animate.set_value(0),
+            run_time=rotation_time
+        )
+        self.stop_ambient_camera_rotation()
+        self.add(vert_slice.copy().clear_updaters())
+        self.wait()
+
+        # third rotation from ac to ab
+        self.begin_ambient_camera_rotation(
+            rate=120 / rotation_time * DEGREES
+        )
+        self.play(
+            endpoint_tracker_1.animate.set_value(1),
+            run_time=rotation_time
+        )
+        self.stop_ambient_camera_rotation()
+        self.wait()
+
+        # # add the cross-section outline
+        # b_range = np.linspace(0, 1, 30 + 1)
+        # a_range = 1 - b_range
+        #
+        # ab_cross_section = get_cross_section(a_range, b_range)
+        # # ab_cross_section.set_shade_in_3d()
+        # self.play(
+        #     Create(ab_cross_section)
+        # )
+        # self.wait()
+
+        # for _ in range(3):
+        #     self.begin_ambient_camera_rotation(
+        #         rate=120 / rotation_time * DEGREES
+        #     )
+        #     self.wait(rotation_time)
+        #     self.stop_ambient_camera_rotation()
+        #     self.wait()
+        #
+        #     if _ == 0:
+        #         a_range = np.zeros(31)
+        #         b_range = np.linspace(1, 0, 31)
+        #         bc_cross_section = get_cross_section(a_range, b_range)
+        #         self.play(
+        #             Create(bc_cross_section)
+        #         )
+        #         self.wait()
+        #     elif _ == 1:
+        #         a_range = np.linspace(0, 1, 31)
+        #         b_range = np.zeros(31)
+        #         ca_cross_section = get_cross_section(a_range, b_range)
+        #         self.play(
+        #             Create(ca_cross_section)
+        #         )
+        #         self.wait()
 
         # rotation for off center view
         # axes_3d_copy = axes_3d.copy()
