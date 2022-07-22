@@ -491,6 +491,7 @@ class Simplex:
 
     @staticmethod
     def sample_between_bary_coords(b1, b2, n=31):
+        """Sample n barycentric points (including endpoints) in between b1 and b2"""
         dc_vec = b2 - b1
         vec_increment = dc_vec / (n - 1)
         sample_points_initial = np.repeat([b1], n, axis=0)
@@ -686,7 +687,7 @@ class TernarySolution(ThreeDScene):
             frame_center=frame_center,
             focal_distance=100 * self.camera.get_focal_distance()
         )
-        self.add(Dot3D(frame_center))  # for debug
+        # self.add(Dot3D(frame_center))  # for debug
         # shift vector for off-center view
         shift_vec_off_center = np.array([-2.5, 2, -3])
         # shift vector for center view
@@ -829,10 +830,39 @@ class TernarySolution(ThreeDScene):
         self.remove(a_label_rotated, c_label_rotated)
         self.wait()
 
+        # add two additional x axes
+        x_axis_bc = VDict(
+            {
+                "axis": x_axis.copy(),
+                "tick_labels": x_tick_labels.copy()
+            }
+        ).rotate(-PI, axis=Z_AXIS).rotate(-60 * DEGREES, axis=Z_AXIS, about_point=x_axis.get_right())
+        x_axis_bc_vec = x_axis_bc["tick_labels"][-1].get_center() - x_axis_bc["tick_labels"][0].get_center()
+        x_axis_bc["tick_labels"].rotate(
+            -PI / 2, axis=x_axis_bc_vec, about_point=x_axis_bc["axis"].get_center()
+        )
+        x_axis_ca = VDict(
+            {
+                "axis": x_axis.copy(),
+                "tick_labels": x_tick_labels.copy()
+            }
+        ).rotate(PI, axis=Z_AXIS).rotate(
+            60 * DEGREES, axis=Z_AXIS, about_point=x_axis.get_left()
+        )
+        x_axis_ca_vec = x_axis_ca["tick_labels"][-1].get_center() - x_axis_ca["tick_labels"][0].get_center()
+        x_axis_ca["tick_labels"].rotate(
+            -PI / 2, axis=x_axis_ca_vec, about_point=x_axis_ca["axis"].get_center()
+        )
+        self.play(
+            Create(x_axis_bc["axis"]),
+            Create(x_axis_ca["axis"])
+        )
+        self.wait()
+
         # move to top-down view
         self.move_camera(
             phi=0 * DEGREES, theta=-90 * DEGREES,
-            # AHA: just the origin
+            # AHA: need a different frame center to shift the ternary base just a bit down
             frame_center=Y_AXIS,
             added_anims=[
                 # set the z axes opacity to 0
@@ -843,29 +873,37 @@ class TernarySolution(ThreeDScene):
                 z_label.animate.set_opacity(0),
                 # rotate the x-axis ticks and tick labels to x-y plane
                 x_ticks.animate.rotate(-PI / 2, axis=X_AXIS),
-                x_tick_labels.animate.rotate(-PI / 2, axis=X_AXIS, about_point=x_axis.get_center())
+                x_tick_labels.animate.rotate(-PI / 2, axis=X_AXIS, about_point=x_axis.get_center()),
+                x_axis_bc["axis"].animate.rotate(-PI / 2, axis=x_axis_bc_vec),
+                x_axis_ca["axis"].animate.rotate(-PI / 2, axis=x_axis_ca_vec),
             ]
         )
         self.wait()
 
+        def rotate_ticks(input_ticks, angle=-30) -> List[Animation]:
+            """Rotate all the ticks by the specified angle"""
+            return [
+                input_tick.animate.rotate(angle * DEGREES, axis=Z_AXIS, about_point=input_tick.get_center())
+                for input_tick in input_ticks
+            ]
+
         # rotate each individual tick
-        tick_rotation_anims = [
-            tick.animate.rotate(-30 * DEGREES, axis=Z_AXIS, about_point=tick.get_center())
-            for tick in x_ticks
-        ]
+        tick_rotation_anims = rotate_ticks(x_ticks)
+        tick_rotation_bc_anims = rotate_ticks(x_axis_bc["axis"].ticks)
+        tick_rotation_ca_anims = rotate_ticks(x_axis_ca["axis"].ticks)
 
         # shift each tick label to match the orientation of the tick
         tick_shift_vec = rotate_vector(
             vector=(x_axis.n2p(0.1) - x_tick_labels[1].get_top()) / np.sqrt(3),
             angle=PI / 2
         )
-        print(tick_shift_vec)
 
         tick_label_shift_anims = [
             tick_label.animate.shift(tick_shift_vec)
             for tick_label in x_tick_labels
         ]
 
+        # couple the tick rotations with the tick label shifting
         tick_anim_combos = [
             AnimationGroup(
                 anim_1, anim_2
@@ -876,6 +914,72 @@ class TernarySolution(ThreeDScene):
         self.play(
             LaggedStart(
                 *tick_anim_combos,
+                lag_ratio=0.5
+            ),
+            run_time=2
+        )
+        self.wait()
+        
+        # show the connecting lines
+        def get_axes_grid_lines(axis_1, axis_2) -> list:
+            axis_1_ticks = axis_1.copy().ticks
+            axis_2_ticks = axis_2.copy().ticks
+            # reverse the tick order for the second axis
+            axis_2_ticks = axis_2_ticks[::-1]
+
+            grid_lines = []
+            for tick_1, tick_2 in zip(axis_1_ticks, axis_2_ticks):
+                line = ThreeDVMobject(stroke_width=2, stroke_opacity=0.3)
+                line.set_points_as_corners(
+                    [
+                        tick_1.get_center(),
+                        tick_2.get_center()
+                    ]
+                )
+                grid_lines.append(line)
+
+            return grid_lines
+
+        grid_lines_ab = get_axes_grid_lines(x_axis, x_axis_bc["axis"])
+        self.play(
+            LaggedStart(
+                *[
+                    Create(line) for line in grid_lines_ab
+                ],
+                lag_ratio=0.3
+            )
+        )
+        self.wait()
+
+        # rotate the ticks on the other two x axes
+        grid_lines_bc = get_axes_grid_lines(x_axis_bc["axis"], x_axis_ca["axis"])
+        grid_lines_bc_anims = [Create(line) for line in grid_lines_bc]
+        tick_bc_anim_combos = [
+            AnimationGroup(
+                anim_1, anim_2
+            )
+            for anim_1, anim_2 in zip(tick_rotation_bc_anims, grid_lines_bc_anims)
+        ]
+        self.play(
+            LaggedStart(
+                *tick_bc_anim_combos,
+                lag_ratio=0.5
+            ),
+            run_time=2
+        )
+        self.wait()
+
+        grid_lines_ca = get_axes_grid_lines(x_axis_ca["axis"], x_axis)
+        grid_lines_ca_anims = [Create(line) for line in grid_lines_ca]
+        tick_ca_anim_combos = [
+            AnimationGroup(
+                anim_1, anim_2
+            )
+            for anim_1, anim_2 in zip(tick_rotation_ca_anims, grid_lines_ca_anims)
+        ]
+        self.play(
+            LaggedStart(
+                *tick_ca_anim_combos,
                 lag_ratio=0.5
             ),
             run_time=2
@@ -893,14 +997,20 @@ class TernarySolution(ThreeDScene):
             ]
         )
 
-        tick_restore_anims = AnimationGroup(
-            *[
-                tick.animate.rotate(
-                    30 * DEGREES, axis=Z_AXIS, about_point=tick.get_center()
-                ).rotate(PI / 2, axis=X_AXIS)
-                for tick in x_ticks
-            ]
-        )
+        def restore_ticks(input_ticks, angle=30, rotation_axis=X_AXIS) -> AnimationGroup:
+            """Restore the ticks to the original orientation"""
+            return AnimationGroup(
+                *[
+                    input_tick.animate.rotate(
+                        angle * DEGREES, axis=Z_AXIS, about_point=input_tick.get_center()
+                    ).rotate(PI / 2, axis=rotation_axis)
+                    for input_tick in input_ticks
+                ]
+            )
+        
+        tick_restore_anims = restore_ticks(x_ticks)
+        tick_restore_bc_anims = restore_ticks(x_axis_bc["axis"].ticks, rotation_axis=x_axis_bc_vec)
+        tick_restore_ca_anims = restore_ticks(x_axis_ca["axis"].ticks, rotation_axis=x_axis_ca_vec)
 
         self.move_camera(
             phi=80 * DEGREES, theta=-90 * DEGREES,
@@ -915,6 +1025,12 @@ class TernarySolution(ThreeDScene):
                 # rotate the x-axis ticks and tick labels back to x-z plane
                 tick_label_restore_anims,
                 tick_restore_anims,
+                tick_restore_bc_anims,
+                tick_restore_ca_anims,
+                # make the grid lines less distracting
+                VGroup(
+                    *grid_lines_ab, *grid_lines_bc, *grid_lines_ca
+                ).animate.set_opacity(0.01)
             ]
         )
         self.wait()
@@ -959,6 +1075,16 @@ class TernarySolution(ThreeDScene):
             )
             return gibbs_ref + gibbs_ideal + gibbs_excess + z_offset
 
+        gibbs_surface_1_trig = ThreeDVMobject(
+            fill_opacity=0, stroke_width=0, color=WHITE
+        ).set_points_as_corners(
+            [
+                axes_3d.c2p(vertex[0], vertex[1], ref_energy + z_offset)
+                for vertex, ref_energy in zip(default_vertices + [default_vertices[0]],
+                                              [a_ref, b_ref, c_ref, a_ref])
+            ]
+        )
+
         gibbs_surface_1 = TernarySurface(vertices=default_vertices,
                                          z_func=get_gibbs,
                                          axes=axes_3d,
@@ -977,11 +1103,18 @@ class TernarySolution(ThreeDScene):
                                          fill_color=BLUE, fill_opacity=0.7,
                                          stroke_opacity=1)
 
-        self.play(FadeIn(gibbs_surface_1))
+        self.play(
+            LaggedStart(
+                DrawBorderThenFill(gibbs_surface_1_trig),
+                FadeIn(gibbs_surface_1),
+                lag_ratio=0.3
+            )
+        )
         self.wait()
 
         self.play(
-            ReplacementTransform(gibbs_surface_1, gibbs_surface_2)
+            ReplacementTransform(gibbs_surface_1, gibbs_surface_2),
+            FadeOut(gibbs_surface_1_trig)
         )
         self.wait()
 
@@ -1051,6 +1184,7 @@ class TernarySolution(ThreeDScene):
             return cross_section
 
         def get_slice_plane():
+            """Draw the vertical slice plane"""
             simplex_for_slice = gibbs_surface_3.simplex
             # get the two endpoints on the barycentric base
             endpoint_1 = convert_linear_to_bary(endpoint_tracker_1.get_value(), simplex_for_slice)
