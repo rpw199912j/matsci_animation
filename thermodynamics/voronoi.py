@@ -183,7 +183,8 @@ class BackgroundVoronoi(Scene):
         ).next_to(bounding_box, RIGHT, buff=3 * DEFAULT_MOBJECT_TO_MOBJECT_BUFFER).align_to(bounding_box, UP)
 
         self.play(
-            Write(msg_1)
+            Write(msg_1),
+            run_time=1
         )
         self.wait()
 
@@ -302,7 +303,7 @@ class BackgroundVoronoi(Scene):
         # emphasize the competition between the volume and surface gibbs energy terms
         msg_3 = MathTex(
             r"&\text{Gibbs energy: }", r"G\\",
-            "&G(r)", "=", r"G_{\text{vol.}}", "+", r"G_{\text{sur.}}"
+            r"&\Delta G_{\text{tot}}", "(r)", "=", r"\Delta G_{\text{vol}}", "+", r"\Delta G_{\text{sur}}"
         ).next_to(msg_2, DOWN, buff=4 * DEFAULT_MOBJECT_TO_MOBJECT_BUFFER).align_to(msg_2, LEFT)
         self.play(
             Write(msg_3)
@@ -311,7 +312,7 @@ class BackgroundVoronoi(Scene):
 
         self.play(
             Indicate(target_nucleus, color=PURPLE, run_time=2),
-            Indicate(msg_3[4], color=PURPLE, run_time=2)
+            Indicate(msg_3[5], color=PURPLE, run_time=2)
         )
         self.wait()
 
@@ -319,7 +320,7 @@ class BackgroundVoronoi(Scene):
             Circumscribe(target_nucleus, shape=Circle,
                          buff=-0.3, color=PURPLE, time_width=1,
                          run_time=2),
-            Indicate(msg_3[6], color=PURPLE, run_time=2)
+            Indicate(msg_3[7], color=PURPLE, run_time=2)
         )
         self.wait()
 
@@ -339,9 +340,24 @@ class BackgroundVoronoi(Scene):
         # show the density assumption
         msg_4 = MathTex(
             r"&\text{Assumption: }", r"\text{no density change}\\",
-            r"&G/\text{mol} = G/\text{vol.}", font_size=40
+            r"&G/\text{mol} = G/\text{vol}", font_size=40
         ).next_to(msg_3, DOWN, buff=4 * DEFAULT_MOBJECT_TO_MOBJECT_BUFFER).align_to(msg_3, LEFT)
         self.play(
             Write(msg_4)
+        )
+        self.wait()
+
+        # transition into the next scene
+        all_mobs = [mob for mob in self.mobjects]
+        all_mobs.remove(msg_3)
+        msg_3_partial = MathTex(
+            r"\Delta G_{\text{tot}}", "&=", r"\Delta G_{\text{vol}}", "+", r"\Delta G_{\text{sur}}\\",
+            "&=", r"\frac{4}{3}\pi r^3\left(G_\beta-G_\alpha\right)\\",
+            "&+",
+            r"4\pi r^2\gamma"
+        ).to_corner(UR)
+        self.play(
+            *[FadeOut(mob) for mob in all_mobs + [msg_3[:2]]],
+            ReplacementTransform(msg_3[2:], msg_3_partial[:5])
         )
         self.wait()
