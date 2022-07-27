@@ -20,7 +20,13 @@ with TCPython() as start:
         calculation = (
             start.select_database_and_elements("TCCU5", ["Cu", "Ag"]).without_default_phases().select_phase("LIQUID").select_phase(
                 "FCC_A1").get_system().
-            with_property_diagram_calculation().
+            with_property_diagram_calculation().with_reference_state(
+                component="Cu",
+                phase="LIQUID"
+            ).with_reference_state(
+                component="Ag",
+                phase="LIQUID"
+            ).
             with_axis(CalculationAxis(ThermodynamicQuantity.mass_fraction_of_a_component("Ag")).
                       set_min(0).
                       set_max(1).
@@ -32,11 +38,13 @@ with TCPython() as start:
         # property_diagram.set_phase_name_style(PhaseNameStyle.ALL)
         groups_liquid = property_diagram.get_values_grouped_by_quantity_of(
             ThermodynamicQuantity.mass_fraction_of_a_component("Ag"),
-            ThermodynamicQuantity.gibbs_energy_of_a_phase("LIQUID", use_ser=True)
+            # ThermodynamicQuantity.gibbs_energy_of_a_phase("LIQUID", use_ser=False)
+            "GWR(LIQUID)"
         )
         groups_fcc = property_diagram.get_values_grouped_by_quantity_of(
             ThermodynamicQuantity.mass_fraction_of_a_component("Ag"),
-            ThermodynamicQuantity.gibbs_energy_of_a_phase("FCC_A1", use_ser=True)
+            # ThermodynamicQuantity.gibbs_energy_of_a_phase("FCC_A1", use_ser=False)
+            "GWR(FCC_A1)"
         )
 
         for group_liquid, group_fcc in zip(groups_liquid.values(), groups_fcc.values()):
@@ -70,7 +78,8 @@ with TCPython() as start:
 
 df_to_store = pd.concat(df_lst)
 
-df_to_store.to_csv(r"C:\Users\rpw19\PycharmProjects\matsci_animation\data\gibbs_energy\binary_Cu_Ag.csv", index=False)
+df_to_store.to_csv(r"C:\Users\rpw19\PycharmProjects\matsci_animation\data\gibbs_energy\binary_Cu_Ag_fixed_ref.csv",
+                   index=False)
 
 # plt.xlabel("Cr [wt fraction]")
 # plt.ylabel("Gibbs energy")
