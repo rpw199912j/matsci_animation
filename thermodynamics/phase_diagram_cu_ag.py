@@ -8,7 +8,8 @@ from scipy.optimize import fsolve
 from scipy.interpolate import CubicSpline
 from scipy.spatial import ConvexHull
 
-config.frame_size = (1080, 1920)
+# config.frame_size = (1080, 1920)
+config.frame_size = (2160, 3840)
 config.flush_cache = True
 config.disable_caching = True
 
@@ -18,7 +19,7 @@ config.disable_caching = True
 class CuAgPhaseDiagram(Scene):
     def __init__(self):
         super().__init__()
-        self.gibbs_df = pd.read_csv("../data/gibbs_energy/binary_Cu_Ag_mass_normalized.csv")
+        self.gibbs_df = pd.read_csv("../data/gibbs_energy/binary_Cu_Ag_fixed_ref.csv")
         self.g_x_axes = None
         self.paths = [
             [],  # alpha solidus
@@ -265,49 +266,74 @@ class CuAgPhaseDiagram(Scene):
         temp_tracker = ValueTracker(current_temp)
 
         # create two axes, one for G-X and one for T-X
-        def get_g_axes():
-            _, fcc_y_vals = self.interpolate_gibbs_data(temp_tracker.get_value(), "FCC")
-            _, liquid_y_vals = self.interpolate_gibbs_data(temp_tracker.get_value(), "LIQUID")
-            all_y_vals = np.append(fcc_y_vals, liquid_y_vals)
-            y_offset = 50
-            y_min, y_max = np.min(all_y_vals) - y_offset, np.max(all_y_vals) + y_offset
-            print(y_min, y_max)
+        # def get_g_axes():
+        #     _, fcc_y_vals = self.interpolate_gibbs_data(temp_tracker.get_value(), "FCC")
+        #     _, liquid_y_vals = self.interpolate_gibbs_data(temp_tracker.get_value(), "LIQUID")
+        #     all_y_vals = np.append(fcc_y_vals, liquid_y_vals)
+        #     y_offset = 50
+        #     y_min, y_max = np.min(all_y_vals) - y_offset, np.max(all_y_vals) + y_offset
+        #
+        #     # get the nearest 50 factors below the y_min
+        #     y_10s_min = math.floor(y_min / 50) * 50
+        #     # get the nearest 50 factors above the y_max
+        #     y_10s_max = int(y_max / 50) * 50
+        #
+        #     # get the all the numbers that are multipliers of 50 in [y_min, y_max]
+        #     y_tick_vals = np.arange(y_10s_min, y_10s_max + 50, 50, dtype=int)
+        #     y_tick_vals = y_tick_vals[np.logical_and(y_tick_vals >= y_min, y_tick_vals <= y_max)]
+        #
+        #     ax = Axes(
+        #         x_range=[0, 1, 0.1],
+        #         y_range=[y_min, y_max, y_max - y_min],
+        #         x_length=8,
+        #         y_length=8,
+        #         tips=False,
+        #         y_axis_config={"include_ticks": False, "numbers_to_include": y_tick_vals,
+        #                        "decimal_number_config": {"num_decimal_places": 0}},
+        #         x_axis_config={"label_direction": UP, "include_numbers": True}
+        #     ).shift(UP * 4.5)
+        #
+        #     # add custom ticks
+        #     ax_y_axis = ax.y_axis
+        #     ticks = VGroup()
+        #     for _ in y_tick_vals:
+        #         ticks.add(ax_y_axis.get_tick(_, ax_y_axis.tick_size))
+        #     ax_y_axis.add(ticks)
+        #     ax_y_axis.ticks = ticks
+        #
+        #     self.g_x_axes = ax
+        #     return ax
 
-            # get the nearest 50 factors below the y_min
-            y_10s_min = math.floor(y_min / 50) * 50
-            # get the nearest 50 factors above the y_max
-            y_10s_max = int(y_max / 50) * 50
-            print(y_10s_min, y_10s_max)
-            # get the all the numbers that are multipliers of 50 in [y_min, y_max]
-            y_tick_vals = np.arange(y_10s_min, y_10s_max + 50, 50, dtype=int)
-            y_tick_vals = y_tick_vals[np.logical_and(y_tick_vals >= y_min, y_tick_vals <= y_max)]
-            print(y_tick_vals)
+        # use a fixed G-X axes
+        y_min, y_max, y_step = -100, 50, 25
+        y_tick_vals = np.arange(y_min, y_max + y_step, y_step, dtype=int)
+        g_x_axes = Axes(
+            x_range=[0, 1, 0.1],
+            y_range=[y_min, y_max, y_max - y_min],
+            x_length=8,
+            y_length=8,
+            tips=False,
+            y_axis_config={"include_ticks": False, "numbers_to_include": y_tick_vals,
+                           "decimal_number_config": {"num_decimal_places": 0},
+                           "numbers_to_exclude": None},
+            x_axis_config={"label_direction": UP, "include_numbers": True}
+        ).shift(UP * 4.5)
 
-            ax = Axes(
-                x_range=[0, 1, 0.1],
-                y_range=[y_min, y_max, y_max - y_min],
-                x_length=8,
-                y_length=8,
-                tips=False,
-                y_axis_config={"include_ticks": False, "numbers_to_include": y_tick_vals,
-                               "decimal_number_config": {"num_decimal_places": 0}},
-                x_axis_config={"label_direction": UP, "include_numbers": True}
-            ).shift(UP * 4.5)
-
-            # add custom ticks
-            ax_y_axis = ax.y_axis
-            ticks = VGroup()
-            for _ in y_tick_vals:
-                ticks.add(ax_y_axis.get_tick(_, ax_y_axis.tick_size))
-            ax_y_axis.add(ticks)
-            ax_y_axis.ticks = ticks
-
-            self.g_x_axes = ax
-            return ax
-
-        g_x_axes = always_redraw(
-            get_g_axes
+        # shift the x-axis to the top of the y-axis
+        x_axis = g_x_axes.get_x_axis()
+        x_axis.shift(
+            g_x_axes.c2p(0, y_max) - g_x_axes.c2p(0, 0)
         )
+
+        # add custom ticks
+        ax_y_axis = g_x_axes.y_axis
+        ticks = VGroup()
+        for _ in y_tick_vals:
+            ticks.add(ax_y_axis.get_tick(_, ax_y_axis.tick_size))
+        ax_y_axis.add(ticks)
+        ax_y_axis.ticks = ticks
+
+        self.g_x_axes = g_x_axes
 
         g_y_axis_label = g_x_axes.get_y_axis_label(
             Tex(r"Gibbs Energy (J/g)").rotate(PI / 2)
@@ -330,6 +356,70 @@ class CuAgPhaseDiagram(Scene):
         ).next_to(t_x_axes.y_axis, LEFT)
 
         self.add(g_x_axes, t_x_axes, g_y_axis_label, t_x_axis_label, t_y_axis_label)
+        self.wait()
+
+        # add the thermo-calc logo
+        thermocalc_logo = SVGMobject(
+            r"../figure/ThermoCalc_logo.svg"
+        ).set(height=config["frame_height"] * 0.10).set_color("#9b193b").shift(10 * UP + 5 * LEFT)
+        self.play(
+            DrawBorderThenFill(thermocalc_logo)
+        )
+
+        # add the chemistry label
+        chemistry_label = Tex(
+            "Cu-Ag", font_size=25
+        ).next_to(thermocalc_logo, DOWN, buff=0.2)
+        self.play(
+            Write(chemistry_label), run_time=0.5
+        )
+        self.wait()
+
+        # display the current temperature
+        temp_label = Tex("T:", font_size=35).shift(10*UP + LEFT)
+        temp_value = always_redraw(
+            lambda:
+            DecimalNumber(
+                number=temp_tracker.get_value(),
+                num_decimal_places=0,
+                font_size=35,
+                group_with_commas=False
+            ).next_to(
+                temp_label, RIGHT, buff=0.5*DEFAULT_MOBJECT_TO_MOBJECT_BUFFER
+            ).align_to(
+                temp_label, DOWN
+            )
+        )
+        temp_unit = always_redraw(
+            lambda:
+            Tex(r"$^\circ$C", font_size=35).next_to(
+                temp_value, RIGHT, buff=0.5 * DEFAULT_MOBJECT_TO_MOBJECT_BUFFER
+            ).align_to(temp_label, DOWN)
+        )
+        temp_display = VGroup(temp_label, temp_value, temp_unit)
+        self.play(
+            Write(temp_display)
+        )
+        self.wait()
+        
+        # add the phase legend
+        fcc_legend = Line(
+            start=g_x_axes.c2p(0.05, 40), end=g_x_axes.c2p(0.15, 40), color=ORANGE
+        )
+        fcc_legend_label = Tex("FCC", font_size=35).next_to(fcc_legend, RIGHT)
+        liquid_legend = Line(
+            start=g_x_axes.c2p(0.05, 30), end=g_x_axes.c2p(0.15, 30), color=BLUE
+        )
+        liquid_legend_label = Tex("LIQUID", font_size=35).next_to(liquid_legend, RIGHT)
+
+        self.play(
+            GrowFromEdge(fcc_legend, LEFT),
+            GrowFromEdge(liquid_legend, LEFT)
+        )
+        self.play(
+            Write(fcc_legend_label),
+            Write(liquid_legend_label)
+        )
         self.wait()
 
         def get_all_mobjects():
@@ -486,7 +576,7 @@ class CuAgPhaseDiagram(Scene):
         )
         self.wait()
         all_mobs.clear_updaters()
-        g_x_axes.clear_updaters()
+        # g_x_axes.clear_updaters()
         # remove visual clutter
         self.play(
             *[Uncreate(mob) for mob in all_mobs[2:-6]]
