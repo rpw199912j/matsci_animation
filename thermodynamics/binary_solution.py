@@ -506,18 +506,6 @@ class Simplex:
         return b1 + frac * dc_vec
 
 
-# simplex = Simplex(
-#     [[0, 0],  # Component A
-#      [1, 0],  # Component B
-#      [0.5, np.sqrt(3)/2]]  # Component C
-# )
-# x, y, *_ = simplex.bary_to_cart(
-#     [1/2, 1/2, 0]
-# )
-# print(np.sqrt(3)/2)
-# print(x, y)
-
-
 class TernarySurface(VGroup, metaclass=ConvertToOpenGL):
     def __init__(
             self,
@@ -919,7 +907,7 @@ class TernarySolution(ThreeDScene):
             run_time=2
         )
         self.wait()
-        
+
         # show the connecting lines
         def get_axes_grid_lines(axis_1, axis_2) -> list:
             axis_1_ticks = axis_1.copy().ticks
@@ -1007,7 +995,7 @@ class TernarySolution(ThreeDScene):
                     for input_tick in input_ticks
                 ]
             )
-        
+
         tick_restore_anims = restore_ticks(x_ticks)
         tick_restore_bc_anims = restore_ticks(x_axis_bc["axis"].ticks, rotation_axis=x_axis_bc_vec)
         tick_restore_ca_anims = restore_ticks(x_axis_ca["axis"].ticks, rotation_axis=x_axis_ca_vec)
@@ -1229,95 +1217,49 @@ class TernarySolution(ThreeDScene):
             Create(vert_slice)
         )
         self.wait()
-        self.add(vert_slice.copy().clear_updaters())
 
         rotation_time = 5
         # first rotation from ab to bc
         self.begin_ambient_camera_rotation(
             rate=120 / rotation_time * DEGREES
         )
+        vert_slice_ab = vert_slice.copy().clear_updaters()
+        vert_slice_ab.set_color(PURPLE)
+        self.add(vert_slice_ab)
         self.play(
             endpoint_tracker_1.animate.set_value(2),
             run_time=rotation_time
         )
         self.stop_ambient_camera_rotation()
-        self.add(vert_slice.copy().clear_updaters())
         self.wait()
 
         # second rotation from bc to ac
         self.begin_ambient_camera_rotation(
-            rate=120 / rotation_time * DEGREES
+            rate=121 / rotation_time * DEGREES
         )
+        vert_slice_bc = vert_slice.copy().clear_updaters()
+        vert_slice_bc.set_color(PURPLE)
+        self.add(vert_slice_bc)
         self.play(
             endpoint_tracker_2.animate.set_value(0),
             run_time=rotation_time
         )
         self.stop_ambient_camera_rotation()
-        self.add(vert_slice.copy().clear_updaters())
         self.wait()
 
         # third rotation from ac to ab
         self.begin_ambient_camera_rotation(
             rate=120 / rotation_time * DEGREES
         )
+        vert_slice_ca = vert_slice.copy().clear_updaters()
+        vert_slice_ca.set_color(PURPLE)
+        self.add(vert_slice_ca)
         self.play(
             endpoint_tracker_1.animate.set_value(1),
             run_time=rotation_time
         )
         self.stop_ambient_camera_rotation()
         self.wait()
-
-        # # add the cross-section outline
-        # b_range = np.linspace(0, 1, 30 + 1)
-        # a_range = 1 - b_range
-        #
-        # ab_cross_section = get_cross_section(a_range, b_range)
-        # # ab_cross_section.set_shade_in_3d()
-        # self.play(
-        #     Create(ab_cross_section)
-        # )
-        # self.wait()
-
-        # for _ in range(3):
-        #     self.begin_ambient_camera_rotation(
-        #         rate=120 / rotation_time * DEGREES
-        #     )
-        #     self.wait(rotation_time)
-        #     self.stop_ambient_camera_rotation()
-        #     self.wait()
-        #
-        #     if _ == 0:
-        #         a_range = np.zeros(31)
-        #         b_range = np.linspace(1, 0, 31)
-        #         bc_cross_section = get_cross_section(a_range, b_range)
-        #         self.play(
-        #             Create(bc_cross_section)
-        #         )
-        #         self.wait()
-        #     elif _ == 1:
-        #         a_range = np.linspace(0, 1, 31)
-        #         b_range = np.zeros(31)
-        #         ca_cross_section = get_cross_section(a_range, b_range)
-        #         self.play(
-        #             Create(ca_cross_section)
-        #         )
-        #         self.wait()
-
-        # rotation for off center view
-        # axes_3d_copy = axes_3d.copy()
-        # for _ in range(3):
-        #     self.play(
-        #         VGroup(
-        #             axes_3d, gibbs_surface_2, x_label, y_label, z_label
-        #         ).animate(
-        #             run_time=5, rate_func=linear
-        #         ).rotate(
-        #             angle=-120 * DEGREES,
-        #             axis=axes_3d_copy.c2p(0, 0, 1) - axes_3d_copy.c2p(0, 0, 0),
-        #             about_point=axes_3d_copy.get_center()
-        #         )
-        #     )
-        #     self.wait()
 
 # debug
 # TernarySolution().render()
