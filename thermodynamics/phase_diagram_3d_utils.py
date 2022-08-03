@@ -12,7 +12,7 @@ from scipy.spatial import ConvexHull
 
 
 # run command:
-# python .\thermodynamics\phase_diagram_cu_ag_3d_utils.py
+# python .\thermodynamics\phase_diagram_3d_utils.py
 
 class Simplex:
     """Modified from https://github.com/materialsproject/pymatgen/blob/v2022.7.19/pymatgen/util/coord.py#L367
