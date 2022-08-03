@@ -304,7 +304,7 @@ bound_3_idx = bound_2_idx + res
 bound_2_indices = [bound_2_idx]
 bound_3_indices = [bound_3_idx]
 
-for _ in range(1, res+1):
+for _ in range(1, res + 1):
     num_points = res - _
     bound_2_idx = bound_3_idx + 1
     bound_3_idx = bound_2_idx + num_points
@@ -323,7 +323,7 @@ bound_3_indices = np.array(
 
 # add addition indices when there are more than 1 phase
 num_phases = 2
-num_points_per_phase = sum(range(1, res+2))
+num_points_per_phase = sum(range(1, res + 2))
 ternary_boundary_indices = []
 for indices in [bound_1_indices, bound_2_indices, bound_3_indices]:
     additional_indices = np.copy(indices)
@@ -354,14 +354,27 @@ hull_simplices_filtered = np.array(
 
 fig4 = ff.create_trisurf(x=u3, y=v3, z=z3,
                          simplices=hull_simplices_filtered,
-                         colormap=['#33DEFF', '#33DEFF', '#33DEFF'],
-                         title="Boy's Surface")
+                         colormap=['#33DEFF', '#33DEFF', '#33DEFF'])
+
 fig4["data"][0].update(opacity=0.6)
 
-data = [fig1.data[0], #fig1.data[1],
-        fig2.data[0], #fig2.data[1],
+# create the mapping from the convexhull.points to the selected vertices
+keys = hull_vertices_idx
+vals = np.arange(len(keys), dtype=np.int32)
+
+mapping_arr = np.zeros(keys.max() + 1, dtype=vals.dtype)
+mapping_arr[keys] = vals
+hull_simplices_filtered_new_indexing = mapping_arr[hull_simplices_filtered]
+
+fig5 = ff.create_trisurf(x=hull_points_projected[:, 0], y=hull_points_projected[:, 1], z=hull_points_projected[:, 2],
+                         simplices=hull_simplices_filtered_new_indexing,
+                         color_func=["#33DEFF"] * len(hull_simplices_filtered_new_indexing))
+
+data = [fig1.data[0],  # fig1.data[1],
+        fig2.data[0],  # fig2.data[1],
         fig3.data[0],
-        fig4.data[0], fig4.data[1]]
+        fig4.data[0], fig4.data[1],
+        fig5.data[1]]
 
 iplot(
     dict(
