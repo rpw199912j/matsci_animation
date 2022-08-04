@@ -277,13 +277,6 @@ fig3 = go.Figure(
     ]
 )
 
-u3 = hull_points[:, 0]
-v3 = hull_points[:, 1]
-z3 = hull_points[:, 2]
-
-tri3 = Delaunay(hull_points[:, :2])
-# simplices3 = tri3.simplices
-
 u3 = convex_hull.points[:, 0]
 v3 = convex_hull.points[:, 1]
 z3 = convex_hull.points[:, 2]
@@ -380,7 +373,10 @@ iplot(
     dict(
         data=data,
         layout=dict(
-            title=f"T={temp}K"
+            title=f"T={temp}K",
+            scene_camera=dict(
+                eye=dict(x=0, y=-1.25, z=1.25)
+            )
         )
     )
 )
