@@ -1,14 +1,17 @@
-# importing required libraries
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
+import networkx as nx
 import plotly.graph_objects as go
 import plotly.figure_factory as ff
 
 from plotly.offline import iplot
-from typing import List, Callable
-from scipy.spatial import Delaunay
-from scipy.spatial import ConvexHull
+from plotly.subplots import make_subplots
+from typing import List, Callable, Iterable
+from itertools import chain, combinations
+from scipy.spatial.distance import euclidean
+from scipy.spatial import Delaunay, ConvexHull, KDTree
+from shapely.geometry import Polygon
+from shapely.ops import unary_union
 
 
 # run command:
@@ -188,10 +191,13 @@ default_vertices = [[0, 0, 0],
                     [1, 0, 0],
                     [1 / 2, np.sqrt(3) / 2, 0]]
 
+res = 200
 gibbs_surface_fcc = TernarySurface(vertices=default_vertices,
-                                   z_func=get_gibbs_fcc)
+                                   z_func=get_gibbs_fcc,
+                                   resolution=(res, res))
 gibbs_surface_liquid = TernarySurface(vertices=default_vertices,
-                                      z_func=get_gibbs_liquid)
+                                      z_func=get_gibbs_liquid,
+                                      resolution=(res, res))
 
 # creating the dataset for plotting
 xs_fcc, ys_fcc, zs_fcc = gibbs_surface_fcc.get_surface()
@@ -217,23 +223,6 @@ hull_points = convex_hull.points[hull_vertices_idx]
 
 hull_points_projected = np.copy(hull_points)
 hull_points_projected[:, -1] = np.max(gibbs_combined) + 100
-
-# # creating figure
-# fig1 = plt.figure()
-# ax = fig1.add_subplot(projection='3d', computed_zorder=True)
-#
-# # creating the plot
-# plot_fcc = ax.plot_trisurf(xs_fcc, ys_fcc, zs_fcc, color='orange', alpha=0.5)
-# plot_liquid = ax.plot_trisurf(xs_liquid, ys_liquid, zs_liquid, color='blue', alpha=0.5)
-#
-# # setting title and labels
-# ax.set_xlabel('x-axis')
-# ax.set_ylabel('y-axis')
-# ax.set_zlabel('z-axis')
-
-# displaying the plot
-# plt.show()
-
 
 # displaying the Plotly 3D plot
 u = xs_fcc
@@ -264,18 +253,6 @@ fig2 = ff.create_trisurf(x=u2, y=v2, z=z2,
                          title="Boy's Surface")
 
 convex_hull_points = hull_points_projected
-fig3 = go.Figure(
-    data=[
-        go.Scatter3d(
-            x=convex_hull_points[:, 0],
-            y=convex_hull_points[:, 1],
-            z=convex_hull_points[:, 2],
-            text=[f"idx: {idx}" for idx in hull_vertices_idx],
-            mode="markers",
-            marker=dict(size=1)
-        )
-    ]
-)
 
 u3 = convex_hull.points[:, 0]
 v3 = convex_hull.points[:, 1]
@@ -291,7 +268,6 @@ def is_on_lower_hull(input_arr, test_arr=hull_vertices_idx) -> bool:
 
 
 # create the index array for the ternary boundary points
-res = 100
 bound_2_idx = 0
 bound_3_idx = bound_2_idx + res
 bound_2_indices = [bound_2_idx]
@@ -363,20 +339,156 @@ fig5 = ff.create_trisurf(x=hull_points_projected[:, 0], y=hull_points_projected[
                          simplices=hull_simplices_filtered_new_indexing,
                          color_func=["#33DEFF"] * len(hull_simplices_filtered_new_indexing))
 
+# create a networkx graph from the projected convex hull points
+single_phase_graph = nx.Graph()
+tree_nodes = hull_points_projected[:, :-1]
+graph_nodes = range(tree_nodes.shape[0])
+single_phase_graph.add_nodes_from(graph_nodes)
+# compute the edges based on an edge distance threshold
+# # create a KDTree for nearest neighbor lookup
+kd_tree = KDTree(tree_nodes)
+# get all pairs of particles that are within max_node_dist
+max_node_dist = euclidean(
+    u=tree_nodes[0],
+    v=tree_nodes[bound_2_indices[0] + 1]
+) * 1.001  # the factor adds a tolerance
+neighbor_edges = kd_tree.query_pairs(r=max_node_dist)
+single_phase_graph.add_edges_from(neighbor_edges)
+# check the connectivity of the single_phase_graph (i.e., separate each connected graph)
+single_phase_graphs = [
+    single_phase_graph.subgraph(c).copy() for c in nx.connected_components(single_phase_graph)
+]
+single_phases: dict = {
+    phase_idx: [node_idx for node_idx in single_phase.nodes]
+    for phase_idx, single_phase in enumerate(single_phase_graphs)
+}
+
+# map each vertex in each simplex to a single phase
+simplices_to_phases = np.copy(hull_simplices_filtered_new_indexing)
+for phase_idx in single_phases.keys():
+    phase_mask = np.isin(hull_simplices_filtered_new_indexing, single_phases[phase_idx])
+    simplices_to_phases[phase_mask] = phase_idx
+
+
+# get the simplex index for all single phases
+def no_null_powerset(input_iterable: Iterable):
+    input_lst = list(input_iterable)
+    return chain.from_iterable(combinations(input_lst, r) for r in range(1, len(input_lst) + 1))
+
+
+# initialize a lookup dictionary
+phases_to_simplices = {
+    comb: [] for comb in no_null_powerset(single_phases.keys())
+}
+# find which phase each simplex belongs to
+for _, simplex in enumerate(simplices_to_phases):
+    phase = tuple(np.unique(simplex))
+    phases_to_simplices[phase].append(_)
+
+
+pass
+
+
+def make_phase_region(simplex_indices):
+    """Given the simplex indices, return a single polygon boundary"""
+    phase_simplices = hull_simplices_filtered_new_indexing[simplex_indices, :]
+    # for simplex in phase_simplices:
+    #     coords = hull_points_projected[simplex, :]
+    #     poly = Polygon(coords[:, :2])
+    polys = [
+        Polygon(hull_points_projected[simplex, :][:, :2])
+        for simplex in phase_simplices
+    ]
+    phase_region = unary_union(polys)
+    return np.array(phase_region.exterior.coords)
+
+
+phase_regions = {
+    phase: make_phase_region(indices)
+    for phase, indices in phases_to_simplices.items()
+}
+
+
+projected_hull_point_traces = [
+    go.Scatter3d(
+        x=hull_points_projected[indices][:, 0],
+        y=hull_points_projected[indices][:, 1],
+        z=hull_points_projected[indices][:, 2],
+        # text=[f"idx: {idx}" for idx in hull_vertices_idx],
+        mode="markers",
+        marker=dict(size=1, color=marker_color)
+    )
+    for indices, marker_color in zip(
+        single_phases.values(),
+        ["#FF595E", "#FFCA3A", "#C5CA30"])
+]
+
+fig3 = go.Figure(
+    data=projected_hull_point_traces
+)
+
+# combine all the traces into one figure
 data = [fig1.data[0],  # fig1.data[1],
         fig2.data[0],  # fig2.data[1],
-        fig3.data[0],
+        *fig3.data[:3],
         fig4.data[0], fig4.data[1],
         fig5.data[1]]
 
-iplot(
-    dict(
-        data=data,
-        layout=dict(
-            title=f"T={temp}K",
-            scene_camera=dict(
-                eye=dict(x=0, y=-1.25, z=1.25)
-            )
+combined_fig = make_subplots(
+    rows=1, cols=2,
+    specs=[
+        [{"type": "scatter3d"}, {"type": "scatter"}]
+    ]
+)
+
+fig = go.Figure(
+    data=data,
+    layout=dict(
+        title=f"T={temp}K",
+        scene_camera=dict(
+            eye=dict(x=0, y=-1.25, z=1.25),
+            projection=dict(type="orthographic")
         )
     )
 )
+
+isothermal_slice_data = [
+    go.Scatter(
+        x=points[:, 0],
+        y=points[:, 1],
+        mode="lines",
+        line=dict(width=1, color="black"),
+        fill="toself",
+        fillcolor=fill_color,
+        name=str(phase_label)
+    )
+    for (phase_label, points), fill_color in zip(
+        phase_regions.items(),
+        ["#FF595E", "#FFCA3A", "#C5CA30", "#8AC926", "#52A675", "#1982C4", "#6A4C93"])
+]
+
+combined_fig.add_traces(
+    data=data,
+    rows=1, cols=1
+)
+
+combined_fig.add_traces(
+    data=isothermal_slice_data,
+    rows=1, cols=2
+)
+
+combined_fig.update_layout(
+    dict(
+        title=f"T={temp}K",
+        scene_camera=dict(
+            eye=dict(x=0, y=-1.25, z=1.25),
+            projection=dict(type="orthographic")
+        )
+    )
+)
+
+iplot(
+    combined_fig
+)
+
+# fig.write_html("../figure/ternary_isothermal_slice.html")
