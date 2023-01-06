@@ -12,168 +12,21 @@ rng = np.random.default_rng(seed)
 # set manim configs
 config.flush_cache = True
 config.disable_caching = True
+config.frame_rate = 60
+config.frame_size = (720, 720)
 
 # set the matplotlib color bar
 cmap = mpl.cm.RdYlBu_r
 norm = mpl.colors.Normalize(vmin=0, vmax=1)
 
-# define physical variables and constants
-R = 8.314  # gas constant
-temp = 1000 + 273.15  # temperature [K]
-dx, dy = 2.0e-9, 2.0e-9  # spacing of computational grids [m]
-La = 39000 - 9. * temp  # Atom interaction constant [J/mol]
-ac = 3.0e-14  # gradient coefficient [Jm2/mol]
-Da = 1.0e-04 * np.exp(-300000 / R / temp)  # diffusion coefficient of A atom [m2/s]
-Db = 2.0e-05 * np.exp(-300000 / R / temp)  # diffusion coefficient of B atom [m2/s]
-dt = (dx * dx / Da) * 0.1  # time increment [s]
-n_steps = 1200  # total number of time-steps
-
-
-class CahnHilliard2DTest(Scene):
-    def __init__(self):
-        super().__init__()
-        self.res = 100  # define the sampling resolution for the concentration grid
-        self.c0 = 0.5  # set the initial uniform composition
-        self.c = np.zeros((self.res, self.res))  # holds the 2D concentration array at t
-        self.c_new = np.zeros((self.res, self.res))  # holds the 2D concentration array at t+dt
-
-    def _init_c(self):
-        """Initialize the concentration array at t=0"""
-        self.c = self.c0 + rng.uniform(size=(self.res, self.res)) * 0.01
-
-    def _update_c(self):
-        """Update the concentration array after each time step"""
-        # TODO: vectorize this part with matrix operation?
-        for j in range(self.res):
-            for i in range(self.res):
-
-                ip = i + 1
-                im = i - 1
-                jp = j + 1
-                jm = j - 1
-                ipp = i + 2
-                imm = i - 2
-                jpp = j + 2
-                jmm = j - 2
-
-                if ip > self.res - 1:  # periodic boundary condition
-                    ip = ip - self.res
-                if im < 0:
-                    im = im + self.res
-                if jp > self.res - 1:
-                    jp = jp - self.res
-                if jm < 0:
-                    jm = jm + self.res
-                if ipp > self.res - 1:
-                    ipp = ipp - self.res
-                if imm < 0:
-                    imm = imm + self.res
-                if jpp > self.res - 1:
-                    jpp = jpp - self.res
-                if jmm < 0:
-                    jmm = jmm + self.res
-
-                cc = self.c[i, j]  # at (i,j) "centeral point"
-                ce = self.c[ip, j]  # at (i+1.j) "eastern point"
-                cw = self.c[im, j]  # at (i-1,j) "western point"
-                cs = self.c[i, jm]  # at (i,j-1) "southern point"
-                cn = self.c[i, jp]  # at (i,j+1) "northern point"
-                cse = self.c[ip, jm]  # at (i+1, j-1)
-                cne = self.c[ip, jp]
-                csw = self.c[im, jm]
-                cnw = self.c[im, jp]
-                cee = self.c[ipp, j]  # at (i+2, j+1)
-                cww = self.c[imm, j]
-                css = self.c[i, jmm]
-                cnn = self.c[i, jpp]
-
-                mu_chem_c = R * temp * (np.log(cc) - np.log(1.0 - cc)) + La * (
-                        1.0 - 2.0 * cc)  # chemical term of the diffusion potential
-                mu_chem_w = R * temp * (np.log(cw) - np.log(1.0 - cw)) + La * (1.0 - 2.0 * cw)
-                mu_chem_e = R * temp * (np.log(ce) - np.log(1.0 - ce)) + La * (1.0 - 2.0 * ce)
-                mu_chem_n = R * temp * (np.log(cn) - np.log(1.0 - cn)) + La * (1.0 - 2.0 * cn)
-                mu_chem_s = R * temp * (np.log(cs) - np.log(1.0 - cs)) + La * (1.0 - 2.0 * cs)
-
-                mu_grad_c = -ac * ((ce - 2.0 * cc + cw) / dx / dx + (
-                        cn - 2.0 * cc + cs) / dy / dy)  # gradient term of the diffusion potential
-                mu_grad_w = -ac * ((cc - 2.0 * cw + cww) / dx / dx + (cnw - 2.0 * cw + csw) / dy / dy)
-                mu_grad_e = -ac * ((cee - 2.0 * ce + cc) / dx / dx + (cne - 2.0 * ce + cse) / dy / dy)
-                mu_grad_n = -ac * ((cne - 2.0 * cn + cnw) / dx / dx + (cnn - 2.0 * cn + cc) / dy / dy)
-                mu_grad_s = -ac * ((cse - 2.0 * cs + csw) / dx / dx + (cc - 2.0 * cs + css) / dy / dy)
-
-                mu_c = mu_chem_c + mu_grad_c  # total diffusion potental
-                mu_w = mu_chem_w + mu_grad_w
-                mu_e = mu_chem_e + mu_grad_e
-                mu_n = mu_chem_n + mu_grad_n
-                mu_s = mu_chem_s + mu_grad_s
-
-                nabla_mu = (mu_w - 2.0 * mu_c + mu_e) / dx / dx + (mu_n - 2.0 * mu_c + mu_s) / dy / dy
-                dc2dx2 = ((ce - cw) * (mu_e - mu_w)) / (4.0 * dx * dx)
-                dc2dy2 = ((cn - cs) * (mu_n - mu_s)) / (4.0 * dy * dy)
-
-                DbDa = Db / Da
-                mob = (Da / R / temp) * (cc + DbDa * (1.0 - cc)) * cc * (1.0 - cc)
-                dmdc = (Da / R / temp) * ((1.0 - DbDa) * cc * (1.0 - cc) + (cc + DbDa * (1.0 - cc)) * (1.0 - 2.0 * cc))
-
-                dcdt = mob * nabla_mu + dmdc * (dc2dx2 + dc2dy2)  # right-hand side of Cahn-Hilliard equation
-                self.c_new[i, j] = self.c[i, j] + dcdt * dt  # update order parameter self.c
-        # update c
-        self.c[:, :] = self.c_new[:, :]
-
-    def conc_to_color(self):
-        """Convert the concentration arrays to a uint8 array in the rgba mode"""
-        # get the image from matplotlib
-        img = plt.imshow(self.c, cmap=cmap, norm=norm)
-        # get the uint8 array
-        color_arr = cmap(img.get_array(), bytes=True)
-        return color_arr
-
-    def construct(self):
-        # initialize the concentration grid
-        self._init_c()
-        # get the color array
-        color_arr = self.conc_to_color()
-        # read the color array as an ImageMobject
-        img = ImageMobject(
-            color_arr
-        )
-        # set the size of the ImageMobject
-        img.height = 4
-
-        self.play(
-            FadeIn(img)
-        )
-        self.wait()
-
-        # carry out the simulation
-        tot_sec = 10
-        sec_per_step = tot_sec / n_steps
-        pbar = tqdm(range(1, n_steps + 1))
-        for _ in pbar:
-            pbar.set_description(f"Time step: {_}")
-            self._update_c()
-            new_color_arr = self.conc_to_color()
-            new_img = ImageMobject(
-                new_color_arr
-            )
-            new_img.height = 4
-            print()
-            # self.wait(0.05)
-            img.become(new_img)
-            self.wait(0.1)
-            # self.play(
-            #     img.animate.become(new_img),
-            #     run_time=sec_per_step,
-            #     rate_func=linear
-            # )
-
 
 class CahnHilliard2D(Scene):
-    def __init__(self):
+    def __init__(self, nx=200, ny=200, steps=5000):
         super().__init__()
         # define the sampling resolution
-        self.n_rows = 200
-        self.n_cols = 200
+        self.n_rows = ny
+        self.n_cols = nx
+        self.n_steps = steps
         # set the initial uniform composition
         self.c0 = 0.5
         # initialize the normalized current, the next and the Laplacian concentration grid
@@ -190,8 +43,6 @@ class CahnHilliard2D(Scene):
         # self.alpha = 1e15
         # self.dt = self.alpha * self.h ** 4
         self.mob = 0.01  # mobility [m^2/sec]
-        # self.sigma = 0.1  # interfacial energy [J/m^2]
-        # self.wid = 1e-8  # interface width [m]
         self.h = 1e-2
         self.A = 100
         self.K = 1e-2
@@ -273,7 +124,7 @@ class CahnHilliard2D(Scene):
             color_arr
         )
         # set the size of the ImageMobject
-        img.height = 4
+        img.height = 8
 
         self.play(
             FadeIn(img)
@@ -282,24 +133,22 @@ class CahnHilliard2D(Scene):
 
         # carry out the simulation
         tot_sec = 10
-        sec_per_step = tot_sec / n_steps
-        pbar = tqdm(range(1, 5000 + 1))
+        # determine the second per frame
+        spf_simu = tot_sec / self.n_steps  # second per frame required by the simulation
+        spf_time = 1 / config.frame_rate  # second per frame allowed by the frame rate
+        # determine every n simulation steps to update the image
+        every_nsteps = int(np.ceil(spf_time / spf_simu))
+        pbar = tqdm(range(1, self.n_steps + 1))
         for _ in pbar:
             pbar.set_description(f"Time step: {_}")
             self._update_c()
-            new_color_arr = self.conc_to_color()
-            new_img = ImageMobject(
-                new_color_arr
-            )
-            new_img.height = 4
-            print()
-            # self.wait(0.05)
-            img.become(new_img)
-            self.wait(0.1)
-            # self.play(
-            #     img.animate.become(new_img),
-            #     run_time=sec_per_step,
-            #     rate_func=linear
-            # )
+            if _ % every_nsteps == 0:
+                new_color_arr = self.conc_to_color()
+                new_img = ImageMobject(
+                    new_color_arr
+                )
+                new_img.height = 8
+                img.become(new_img)
+                self.wait(spf_time)
 
 # CahnHilliard2D().render()
