@@ -90,6 +90,20 @@ class CommonTangent(Scene):
         )
 
     @staticmethod
+    def get_tangent_line(coord, m, ax):
+        x, y = coord
+        b = y - m * x
+
+        tangent_line = DashedVMobject(
+            vmobject=ax.plot(
+                lambda _: m * _ + b,
+                color=BLACK,
+                stroke_width=2, stroke_opacity=0.5
+            )
+        )
+        return tangent_line
+
+    @staticmethod
     def get_line(point_left, point_right, ax):
         if point_left is None or point_right is None:
             return Dot().set_opacity(0)
@@ -324,6 +338,114 @@ class CommonTangent(Scene):
             )
         )
 
+        self.play(
+            Create(solid_gibbs)
+        )
+        self.play(
+            Create(liquid_gibbs)
+        )
+        self.wait()
+
+        self.play(
+            LaggedStart(
+                Write(mu_a_solid),
+                Write(mu_a_liquid),
+                Write(mu_b_solid),
+                Write(mu_b_liquid),
+                lag_ratio=1
+            )
+        )
+        self.wait()
+
+        # Show the common tangent construction as slopes lying on the same line
+        ct = self.get_common_tangent_points(get_solid_gibbs, get_liquid_gibbs)
+        x_mu_solid = ValueTracker(0.85)
+        x_mu_liquid =  ValueTracker(0.2)
+
+        def get_slopes():
+            # get the current composition for liquid and solid
+            x_solid, x_liquid = x_mu_solid.get_value(), x_mu_liquid.get_value()
+            slope_pt_coords = [[x_solid, get_solid_gibbs(x_solid)],
+                               [x_liquid, get_liquid_gibbs(x_liquid)]]
+            slope_pts = [
+                self.draw_tangent_point(_, axes)
+                for _ in slope_pt_coords
+            ]
+
+            # plot the respective tangent lines at the solid and liquid compositions
+            x_solid_vals = np.arange(0, 1+0.001, 0.001)
+            x_solid_vals = np.sort(np.unique(np.append(x_solid_vals, x_solid)))
+            solid_slopes = np.gradient(
+                get_solid_gibbs(x_solid_vals), x_solid_vals
+            )
+            x_liquid_vals = np.arange(0, 1+0.001, 0.001)
+            x_liquid_vals = np.sort(np.unique(np.append(x_liquid_vals, x_liquid)))
+            liquid_slopes = np.gradient(
+                get_liquid_gibbs(x_liquid_vals), x_liquid_vals
+            )
+            # obtain the tangent slopes
+            solid_slope = solid_slopes[x_solid_vals == x_solid][0]
+            liquid_slope = liquid_slopes[x_liquid_vals == x_liquid][0]
+            solid_tangent_line = self.get_tangent_line(slope_pt_coords[0], solid_slope, axes)
+            liquid_tangent_line = self.get_tangent_line(slope_pt_coords[1], liquid_slope, axes)
+
+            # add the chemical potential labels
+            a_solid = MathTex(
+                r"\mu_A^S", font_size=25
+            ).next_to(
+                solid_tangent_line.get_all_points()[0],
+                direction=LEFT, buff=0.8 * DEFAULT_MOBJECT_TO_MOBJECT_BUFFER
+            )
+            a_liquid = MathTex(
+                r"\mu_A^L", font_size=25
+            ).next_to(
+                liquid_tangent_line.get_all_points()[0], direction=RIGHT, buff=0.8 * DEFAULT_MOBJECT_TO_MOBJECT_BUFFER
+            )
+            b_solid = MathTex(
+                r"\mu_B^S", font_size=25
+            ).next_to(
+                solid_tangent_line.get_all_points()[-1], direction=LEFT, buff=0.8 * DEFAULT_MOBJECT_TO_MOBJECT_BUFFER
+            )
+            b_liquid = MathTex(
+                r"\mu_B^L", font_size=25
+            ).next_to(
+                liquid_tangent_line.get_all_points()[-1], direction=RIGHT, buff=0.8 * DEFAULT_MOBJECT_TO_MOBJECT_BUFFER
+            )
+
+            return VGroup(
+                *slope_pts,
+                solid_tangent_line,
+                liquid_tangent_line,
+                a_solid, a_liquid, b_solid, b_liquid
+            )
+
+        slopes = always_redraw(get_slopes)
+        self.play(
+            FadeIn(slopes[:2])
+        )
+        self.play(
+            GrowFromPoint(slopes[2], point=slopes[0]),
+            GrowFromPoint(slopes[3], point=slopes[1])
+        )
+        self.wait(0.5)
+        self.play(
+            Write(slopes[4:])
+        )
+        self.add(slopes)
+        self.wait()
+
+        self.play(
+            x_mu_solid.animate.set_value(ct[1][0]),
+            x_mu_liquid.animate.set_value(ct[0][0]),
+            run_time=2
+        )
+        self.wait()
+        self.play(
+            FadeOut(slopes)
+        )
+        self.wait()
+
+
         # Create the common tangent points and connecting line
         def get_tangent():
             common_tangents = self.get_common_tangent_points(get_solid_gibbs, get_liquid_gibbs)
@@ -356,25 +478,6 @@ class CommonTangent(Scene):
             )
 
         tangent = always_redraw(get_tangent)
-
-        self.play(
-            Create(solid_gibbs)
-        )
-        self.play(
-            Create(liquid_gibbs)
-        )
-        self.wait()
-
-        self.play(
-            LaggedStart(
-                Write(mu_a_solid),
-                Write(mu_a_liquid),
-                Write(mu_b_solid),
-                Write(mu_b_liquid),
-                lag_ratio=1
-            )
-        )
-        self.wait()
 
         self.play(
             Create(tangent[0])
@@ -421,3 +524,4 @@ class CommonTangent(Scene):
         )
         self.wait()
 
+# CommonTangent().render()
