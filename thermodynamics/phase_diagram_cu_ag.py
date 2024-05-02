@@ -10,6 +10,7 @@ from scipy.spatial import ConvexHull
 
 # config.frame_size = (1080, 1920)
 config.frame_size = (2160, 3840)
+config.frame_rate = 60
 config.flush_cache = True
 config.disable_caching = True
 
@@ -153,7 +154,7 @@ class CuAgPhaseDiagram(Scene):
         bound_path = ax.plot_line_graph(
             x_values=path_arr[:, 0],
             y_values=path_arr[:, 1],
-            line_color=WHITE,
+            line_color=BLACK,
             add_vertex_dots=False,
             stroke_width=2
         )["line_graph"]
@@ -186,7 +187,7 @@ class CuAgPhaseDiagram(Scene):
         tangent_line = DashedVMobject(
             vmobject=ax.plot(
                 lambda x: m * x + b,
-                color=WHITE,
+                color=BLACK,
                 stroke_width=2, stroke_opacity=0.5
             )
         )
@@ -246,7 +247,7 @@ class CuAgPhaseDiagram(Scene):
                         beta_fcc_liquid, beta_fcc, alpha_beta_fcc]
         # phase_bound_colors = [ORANGE, GREEN, BLUE,
         #                       YELLOW, LIGHT_BROWN, PURPLE]
-        phase_bound_colors = [WHITE] * len(phase_bounds)
+        phase_bound_colors = [BLACK] * len(phase_bounds)
         regions = [self.get_poly(phase_bound, ax, color=c)
                    for phase_bound, c in zip(phase_bounds, phase_bound_colors)]
         return regions
@@ -259,6 +260,14 @@ class CuAgPhaseDiagram(Scene):
         )
 
     def construct(self):
+        # Set the color theme to be the white background
+        DecimalNumber.set_default(color=BLACK)
+        Tex.set_default(color=BLACK)
+        MathTex.set_default(color=BLACK)
+        NumberLine.set_default(color=BLACK)
+        Dot.set_default(color=BLACK)
+        self.camera.background_color = WHITE
+
         # get all the temperature in descending order
         temps = self.gibbs_df["temp"].unique()[::-1]
 
@@ -480,7 +489,7 @@ class CuAgPhaseDiagram(Scene):
                         eutectic_line = Line(
                             start=t_x_axes.c2p(*left_end),
                             end=t_x_axes.c2p(*right_end),
-                            color=WHITE,
+                            color=BLACK,
                             stroke_width=2
                         )
                         self.add(eutectic_line)
@@ -511,7 +520,7 @@ class CuAgPhaseDiagram(Scene):
                     start=g_x_point,
                     end=t_x_point,
                     stroke_width=2,
-                    color=WHITE
+                    color=BLACK
                 )
                 for g_x_point, t_x_point in zip(tangent_points, phase_diagram_points)
             ]
@@ -563,7 +572,7 @@ class CuAgPhaseDiagram(Scene):
             Line(
                 start=t_x_axes.c2p(t_x_axes.x_range[0], temp_tracker.get_value()),
                 end=t_x_axes.c2p(t_x_axes.x_range[1], temp_tracker.get_value()),
-                color=WHITE, stroke_opacity=0.5
+                color=BLACK, stroke_opacity=0.5
             )
         )
         self.play(
